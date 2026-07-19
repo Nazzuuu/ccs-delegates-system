@@ -6,8 +6,9 @@ COPY tfvc-backend/package*.json ./
 RUN npm install
 
 COPY tfvc-backend/ .
+RUN chmod +x node_modules/.bin/strapi
 RUN npm run build
 
 EXPOSE 1337
 
-CMD ["npm", "run", "start"]
+CMD ["node_modules/.bin/strapi", "start"]
