@@ -1,7 +1,7 @@
 // src/api/strapi.ts
 // Strapi v5 uses documentId (string) for PUT/DELETE, not the numeric id.
 
-const BASE = 'http://localhost:1337/api'
+const BASE = 'https://ccs-delegates-system-production.up.railway.app/api'
 const TOKEN = '6a7985326a8c160a29b5610e825f671b755be67b011269e1becb15cde7b756b78237eb21d1487011b795a49256ebf86ab72b7bf49c9a5cdb96fd96a03de76752600bca9804f3db1cf5919bbc08629d9dc7549abb31ff7a8b1304b27614a11e4af551c091f37a57752d6b5b6d2fabc6ac3dc13a61d65e5cf322526cfdd15ccc5a'
 
 const headers = {
