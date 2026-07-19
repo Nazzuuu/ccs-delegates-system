@@ -91,7 +91,7 @@ function openImportModal() {
   importProgress.value   = 0
   importResult.value     = null
   showImportModal.value  = true
-  // reset file input next tick
+
   setTimeout(() => { if (importFileInput.value) importFileInput.value.value = '' }, 0)
 }
 
@@ -112,12 +112,12 @@ function onFileChange(e: Event) {
       const data     = ev.target?.result
       const workbook = XLSX.read(data, { type: 'array' })
       const sheet    = workbook.Sheets[workbook.SheetNames[0]]
-      // sheet_to_json with header:1 gives raw row arrays
+      
       const raw: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
       if (raw.length < 2) { importParseError.value = 'File is empty or has no data rows.'; return }
 
-      // Detect header row — look for columns named "name" and "year"
+  
       const headers: string[] = raw[0].map((h: any) => String(h).toLowerCase().trim())
       const nameCol = headers.findIndex(h => h.includes('name'))
       const yearCol = headers.findIndex(h => h.includes('year'))
@@ -149,7 +149,7 @@ async function runImport() {
   importStep.value    = 'importing'
   importProgress.value = 0
 
-
+//...
   const timer = setInterval(() => {
     if (importProgress.value < 85) importProgress.value += 5
   }, 200)
@@ -159,14 +159,14 @@ async function runImport() {
     importResult.value   = result
     importProgress.value = 100
     importStep.value     = 'done'
-    // Reload the delegates list to reflect newly added entries
+
     await loadDelegates(true)
   } finally {
     clearInterval(timer)
   }
 }
 
-// computed counts for preview
+
 const previewValid   = computed(() => importRows.value.filter(r => r.yearLevel !== '').length)
 const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel === '').length)
 </script>
