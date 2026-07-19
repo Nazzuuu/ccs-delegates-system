@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "app_users",
+  "info": {
+    "singularName": "app-user",
+    "pluralName": "app-users",
+    "displayName": "App User",
+    "description": "CCS Delegates System login accounts"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "email": {
+      "type": "email",
+      "required": true,
+      "unique": true
+    },
+    "password": {
+      "type": "string",
+      "required": true
+    },
+    "isAdmin": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    }
+  }
+}

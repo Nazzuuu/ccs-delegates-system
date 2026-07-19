@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "delegates",
+  "info": {
+    "singularName": "delegate",
+    "pluralName": "delegates",
+    "displayName": "Delegate",
+    "description": "TFVC Delegates list with payment status"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "yearLevel": {
+      "type": "enumeration",
+      "enum": [
+        "First Year",
+        "Second Year",
+        "Third Year",
+        "Fourth Year"
+      ],
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "Paid",
+        "Not Paid",
+        "Backout"
+      ],
+      "required": true,
+      "default": "Not Paid"
+    },
+    "isPaid": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "isReceived": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    }
+  }
+}
