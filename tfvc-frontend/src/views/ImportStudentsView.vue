@@ -111,14 +111,17 @@ function onFileChange(e: Event) {
     try {
       const data     = ev.target?.result
       const workbook = XLSX.read(data, { type: 'array' })
-      const sheet    = workbook.Sheets[workbook.SheetNames[0]]
+      const sheetName = workbook.SheetNames[0]
+      if (!sheetName) { importParseError.value = 'No sheets found in the file.'; return }
+      const sheet    = workbook.Sheets[sheetName]
       
       const raw: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
       if (raw.length < 2) { importParseError.value = 'File is empty or has no data rows.'; return }
 
-  
-      const headers: string[] = raw[0].map((h: any) => String(h).toLowerCase().trim())
+      const headerRow = raw[0]
+      if (!headerRow) { importParseError.value = 'Could not read the header row.'; return }
+      const headers: string[] = headerRow.map((h: any) => String(h).toLowerCase().trim())
       const nameCol = headers.findIndex(h => h.includes('name'))
       const yearCol = headers.findIndex(h => h.includes('year'))
 
@@ -128,8 +131,8 @@ function onFileChange(e: Event) {
       const rows: ImportRow[] = []
       for (let i = 1; i < raw.length; i++) {
         const row  = raw[i]
-        const name = String(row[nameCol] ?? '').trim()
-        const rawYear = String(row[yearCol] ?? '').trim().toLowerCase()
+       const name = String(row?.[nameCol] ?? '').trim()
+      const rawYear = String(row?.[yearCol] ?? '').trim().toLowerCase()
         const year = YEAR_MAP[rawYear] ?? ''
         if (!name) continue
         rows.push({ name, yearLevel: year })
