@@ -149,7 +149,7 @@ async function runImport() {
   importStep.value    = 'importing'
   importProgress.value = 0
 
-//...
+//......
   const timer = setInterval(() => {
     if (importProgress.value < 85) importProgress.value += 5
   }, 200)
