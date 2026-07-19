@@ -86,7 +86,7 @@ async function handleRegister() {
     password.value        = ''
     confirmPassword.value = ''
   } catch (e: any) {
-    errorMsg.value = e.message ?? 'Failed to create account. Make sure Strapi is running.'
+    errorMsg.value = e.message ?? 'Failed to create account. Please try again.'
   } finally {
     isLoading.value = false
   }

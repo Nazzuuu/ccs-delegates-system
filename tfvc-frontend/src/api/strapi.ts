@@ -2,7 +2,7 @@
 // Strapi v5 uses documentId (string) for PUT/DELETE, not the numeric id.
 
 const BASE = 'https://ccs-delegates-system-production.up.railway.app/api'
-const TOKEN = '6a7985326a8c160a29b5610e825f671b755be67b011269e1becb15cde7b756b78237eb21d1487011b795a49256ebf86ab72b7bf49c9a5cdb96fd96a03de76752600bca9804f3db1cf5919bbc08629d9dc7549abb31ff7a8b1304b27614a11e4af551c091f37a57752d6b5b6d2fabc6ac3dc13a61d65e5cf322526cfdd15ccc5a'
+const TOKEN = 'b89257ecd966dd155d2459982e9aa6dfee03db74c16f054cfb75ddaa74a84e8190dcd47588d1028b5cf67cbf2bbe8a1a5e896ab231b253a0874009157a95a7a49e2e404eee30ea1519f48b7e6f3e9465feee5e6353e90557ca22252749130ab710742ea47c966c4f79048026bfc9d6c0f9a8d259b6d3ce7b2a543f951cddb435'
 
 const headers = {
   'Content-Type': 'application/json',
