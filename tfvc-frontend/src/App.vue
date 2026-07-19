@@ -11,7 +11,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 function toggleAutoRefresh() {
   autoRefresh.value = !autoRefresh.value
   if (autoRefresh.value) {
-    refreshTimer = setInterval(() => loadDelegates(true), 1000)
+    refreshTimer = setInterval(() => loadDelegates(true, true), 1000)
   } else {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }

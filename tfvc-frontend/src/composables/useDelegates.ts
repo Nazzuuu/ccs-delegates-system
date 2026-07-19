@@ -16,18 +16,19 @@ export const error = ref<string | null>(null)
 
 let loaded = false
 
-/** Load all delegates from Strapi. Skips if already loaded; pass force=true to reload. */
-export async function loadDelegates(force = false) {
+/** Load all delegates from Strapi. Skips if already loaded; pass force=true to reload. Pass silent=true to skip loading spinner (for auto-refresh). */
+export async function loadDelegates(force = false, silent = false) {
   if (loaded && !force) return
-  loading.value = true
+  if (!silent) loading.value = true
   error.value = null
   try {
-    delegates.value = await fetchAllDelegates()
+    const fresh = await fetchAllDelegates()
+    delegates.value = fresh
     loaded = true
   } catch (e: any) {
     error.value = e.message ?? 'Failed to load delegates'
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
