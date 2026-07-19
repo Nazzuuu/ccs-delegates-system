@@ -113,8 +113,9 @@ function onFileChange(e: Event) {
       const workbook = XLSX.read(data, { type: 'array' })
       const sheetName = workbook.SheetNames[0]
       if (!sheetName) { importParseError.value = 'No sheets found in the file.'; return }
-      const sheet    = workbook.Sheets[sheetName]
-      
+      const sheet = workbook.Sheets[sheetName]
+      if (!sheet) { importParseError.value = 'Could not read the sheet.'; return }
+
       const raw: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
       if (raw.length < 2) { importParseError.value = 'File is empty or has no data rows.'; return }
