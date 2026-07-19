@@ -8,7 +8,7 @@ const config: Core.Config.Middlewares = [
     name: 'strapi::cors',
     config: {
       enabled: true,
-      origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:1337'],
+      origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:1337', 'https://ccs-delegates-system.vercel.app'],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
       headers: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
       keepHeaderOnError: true,
