@@ -2,6 +2,20 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { logout, isSuperAdmin, currentUser } from './composables/useAuth'
+import { loadDelegates } from './composables/useDelegates'
+
+// ── Auto-refresh ───────────────────────────────────────────────────────────
+const autoRefresh = ref(false)
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+function toggleAutoRefresh() {
+  autoRefresh.value = !autoRefresh.value
+  if (autoRefresh.value) {
+    refreshTimer = setInterval(() => loadDelegates(true), 1000)
+  } else {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
+  }
+}
 
 const router = useRouter()
 const route  = useRoute()
@@ -30,7 +44,10 @@ onMounted(() => {
     sidebarOpen.value = saved === 'true'
   }
 })
-onUnmounted(() => window.removeEventListener('resize', checkMobile))
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+  if (refreshTimer) clearInterval(refreshTimer)
+})
 
 function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value
@@ -224,8 +241,22 @@ const isOnLogin = () => route.path === '/login'
           </svg>
         </button>
 
-        <!-- Right: dark mode + profile -->
+        <!-- Right: auto-refresh + dark mode + profile -->
         <div class="flex items-center gap-2 ml-auto">
+          <!-- Auto-refresh toggle -->
+          <button @click="toggleAutoRefresh"
+            :title="autoRefresh ? 'Auto-refresh ON (click to stop)' : 'Auto-refresh OFF (click to start)'"
+            :class="[
+              'flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+              autoRefresh
+                ? 'border-sync-green bg-green-50 dark:bg-green-900/30 text-sync-green'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            ]">
+            <svg :class="['w-4 h-4 flex-shrink-0', autoRefresh ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span class="hidden sm:inline">{{ autoRefresh ? 'Live' : 'Refresh' }}</span>
+          </button>
           <!-- Dark mode toggle -->
           <button @click="toggleTheme"
             class="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
