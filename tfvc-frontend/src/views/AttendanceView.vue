@@ -488,7 +488,7 @@ const filteredStudents = computed(() =>
     const q = stuSearch.value.toLowerCase()
     const matchSearch = !q || s.studentId.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
     const matchYear   = !stuYearFilter.value || s.yearLevel.toLowerCase().trim() === stuYearFilter.value.toLowerCase().trim()
-    const matchDay    = stuDayFilter.value === 'All' || paidDayMap.value.get(s.studentId) === stuDayFilter.value
+    const matchDay    = stuDayFilter.value === 'All' || paidDayMap.value.get(paidDayKeyOf(s.name)) === stuDayFilter.value
     return matchSearch && matchYear && matchDay
   })
 )
@@ -1096,11 +1096,12 @@ async function setPaidDay(row: PaidRow, day: 'First Day' | 'Second Day') {
     await updateDelegate(row.documentId, { status: 'Paid' })
 
     // 2. Always persist to localStorage immediately (works even before Strapi schema is deployed)
-    savePaidDayToStorage(row.studentId, newDay)
+    savePaidDayToStorage(row.name, newDay)
 
     // 3. Try to save paidDay to att-student in Strapi (graceful — fails silently if field not yet deployed)
+    // Match ONLY by name (studentId in PaidRow may be the fake delegate numeric id before schema deploy)
     let attStudent = students.value.find(
-      s => s.studentId === row.studentId || s.name.toLowerCase().trim() === row.name.toLowerCase().trim()
+      s => s.name.toUpperCase().trim() === row.name.toUpperCase().trim()
     )
     try {
       if (!attStudent) {
@@ -1163,14 +1164,18 @@ async function handlePaidPull() {
     }
 
     const built: PaidRow[] = paid.map(d => {
-      // Cross-reference existing att-students (Strapi) or localStorage for saved paidDay
-      const attStu = students.value.find(
-        s => s.studentId === String(d.id) || s.name.toLowerCase().trim() === d.name.toLowerCase().trim()
-      )
-      const strapiDay = attStu?.paidDay ?? null
-      const localDay  = getPaidDayFromStorage(String(d.id))
+      // Use real studentId from delegate (populated after Railway deploys the schema)
+      // Fall back to name-based localStorage lookup for paidDay
+      const strapiDay = students.value.find(
+        s => s.name.toUpperCase().trim() === d.name.toUpperCase().trim()
+      )?.paidDay ?? null
+      const localDay = getPaidDayFromStorage(d.name)
       return {
-        id: d.id, documentId: d.documentId, studentId: String(d.id), name: d.name, yearLevel: d.yearLevel,
+        id: d.id,
+        documentId: d.documentId,
+        studentId: d.studentId || String(d.id),  // real student ID once schema deployed
+        name: d.name,
+        yearLevel: d.yearLevel,
         status: strapiDay ?? localDay,
       }
     })
@@ -1665,11 +1670,11 @@ onMounted(() => {
                     <td class="px-4 py-3 text-gray-500">{{ shortYear(s.yearLevel) }}</td>
                     <td class="px-4 py-3 text-gray-500">{{ s.dept }}</td>
                     <td class="px-4 py-3">
-                      <span v-if="paidDayMap.get(s.studentId) === 'First Day'"
+                      <span v-if="paidDayMap.get(paidDayKeyOf(s.name)) === 'First Day'"
                         class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                         First Day
                       </span>
-                      <span v-else-if="paidDayMap.get(s.studentId) === 'Second Day'"
+                      <span v-else-if="paidDayMap.get(paidDayKeyOf(s.name)) === 'Second Day'"
                         class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                         Second Day
                       </span>
