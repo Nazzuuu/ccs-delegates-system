@@ -241,6 +241,7 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
           <thead>
             <tr>
               <th class="table-th w-10 hidden sm:table-cell">#</th>
+              <th class="table-th">Student ID</th>
               <th class="table-th">Name</th>
               <th class="table-th">Year Level</th>
               <th class="table-th">Status</th>
@@ -250,6 +251,7 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
           <tbody>
             <tr v-for="(d, idx) in paginated" :key="d.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
               <td class="table-td text-gray-400 text-xs hidden sm:table-cell">{{ (currentPage-1)*10+idx+1 }}</td>
+              <td class="table-td font-mono text-xs text-gray-500 dark:text-gray-400">{{ d.studentId || '—' }}</td>
               <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
               <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
               <td class="table-td">
@@ -264,7 +266,7 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
               </td>
             </tr>
             <tr v-if="paginated.length === 0">
-              <td colspan="5" class="table-td text-center text-gray-400 py-10">No students found.</td>
+              <td colspan="6" class="table-td text-center text-gray-400 py-10">No students found.</td>
             </tr>
           </tbody>
         </table>
