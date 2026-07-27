@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useDelegates } from '../composables/useDelegates'
 
-const { delegates, filtered, loading, error, searchQuery, filterStatus, filterYear, yearLevels, loadDelegates } = useDelegates()
+const { delegates, filtered, loading, error, searchQuery, filterStatus, filterYear, yearLevels, shortYear, loadDelegates } = useDelegates()
 
 onMounted(() => loadDelegates())
 
@@ -71,7 +71,7 @@ function nextPage() { if (currentPage.value < totalPages.value) currentPage.valu
             <option value="Not Paid">Not Paid</option>
           </select>
           <select v-model="filterYear" class="input-search flex-1 sm:flex-none sm:w-auto sm:min-w-[140px]">
-            <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : y }}</option>
+            <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : shortYear(y) }}</option>
           </select>
         </div>
       </div>
@@ -91,6 +91,7 @@ function nextPage() { if (currentPage.value < totalPages.value) currentPage.valu
           <thead>
             <tr>
               <th class="table-th w-10">#</th>
+              <th class="table-th">Student ID</th>
               <th class="table-th">Name</th>
               <th class="table-th">Year Level</th>
               <th class="table-th">Status</th>
@@ -99,14 +100,15 @@ function nextPage() { if (currentPage.value < totalPages.value) currentPage.valu
           <tbody>
             <tr v-for="(d, idx) in paginated" :key="d.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
               <td class="table-td text-gray-400 text-xs">{{ (currentPage - 1) * 10 + idx + 1 }}</td>
+              <td class="table-td font-mono text-xs text-gray-500 dark:text-gray-400">{{ d.studentId || '—' }}</td>
               <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
-              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ d.yearLevel }}</td>
+              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
               <td class="table-td">
                 <span :class="{'badge-paid': d.status==='Paid', 'badge-unpaid': d.status==='Not Paid', 'badge-backout': d.status==='Backout'}">{{ d.status }}</span>
               </td>
             </tr>
             <tr v-if="paginated.length === 0">
-              <td colspan="4" class="table-td text-center text-gray-400 py-10">No delegates found.</td>
+              <td colspan="5" class="table-td text-center text-gray-400 py-10">No delegates found.</td>
             </tr>
           </tbody>
         </table>

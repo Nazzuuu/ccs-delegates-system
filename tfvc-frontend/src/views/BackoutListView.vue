@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useDelegates } from '../composables/useDelegates'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
-const { loading, error, yearLevels, backoutList, markUnpaid, loadDelegates } = useDelegates()
+const { loading, error, yearLevels, shortYear, backoutList, markUnpaid, loadDelegates } = useDelegates()
 onMounted(() => loadDelegates())
 
 const searchQuery = ref('')
@@ -69,7 +69,7 @@ async function handleConfirm() {
           <input v-model="searchQuery" type="text" placeholder="Search name..." class="input-search pl-9"/>
         </div>
         <select v-model="filterYear" class="input-search sm:w-auto sm:min-w-[140px]">
-          <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : y }}</option>
+          <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : shortYear(y) }}</option>
         </select>
       </div>
     </div>
@@ -83,6 +83,7 @@ async function handleConfirm() {
         <table class="w-full min-w-[480px]">
           <thead><tr>
             <th class="table-th w-10">#</th>
+            <th class="table-th">Student ID</th>
             <th class="table-th">Name</th>
             <th class="table-th">Year Level</th>
             <th class="table-th">Status</th>
@@ -91,8 +92,9 @@ async function handleConfirm() {
           <tbody>
             <tr v-for="(d, idx) in paginated" :key="d.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
               <td class="table-td text-gray-400 text-xs">{{ (currentPage - 1) * 10 + idx + 1 }}</td>
+              <td class="table-td font-mono text-xs text-gray-500 dark:text-gray-400">{{ d.studentId || '—' }}</td>
               <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
-              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ d.yearLevel }}</td>
+              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
               <td class="table-td"><span class="badge-backout">Backout</span></td>
               <td class="table-td text-center">
                 <button @click="askRestore(d.id, d.name)" class="btn-warning inline-flex items-center gap-1 text-xs px-2.5 py-1">
@@ -101,7 +103,7 @@ async function handleConfirm() {
                 </button>
               </td>
             </tr>
-            <tr v-if="paginated.length === 0"><td colspan="5" class="table-td text-center text-gray-400 py-10">No backout delegates found.</td></tr>
+            <tr v-if="paginated.length === 0"><td colspan="6" class="table-td text-center text-gray-400 py-10">No backout delegates found.</td></tr>
           </tbody>
         </table>
       </div>

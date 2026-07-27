@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useDelegates } from '../composables/useDelegates'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
-const { delegates, loading, error, searchQuery, filterYear, yearLevels, markReceived, markNotReceived, loadDelegates } = useDelegates()
+const { delegates, loading, error, searchQuery, filterYear, yearLevels, shortYear, markReceived, markNotReceived, loadDelegates } = useDelegates()
 
 onMounted(() => loadDelegates())
 
@@ -109,7 +109,7 @@ async function handleConfirm() {
             <option value="Not Received">Not Received</option>
           </select>
           <select v-model="filterYear" class="input-search flex-1 sm:flex-none sm:w-36">
-            <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : y }}</option>
+            <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : shortYear(y) }}</option>
           </select>
         </div>
       </div>
@@ -134,6 +134,7 @@ async function handleConfirm() {
             <tr>
               <!-- # hidden on small screens to save space -->
               <th class="table-th w-10 hidden sm:table-cell">#</th>
+              <th class="table-th">Student ID</th>
               <th class="table-th">Name</th>
               <th class="table-th">Year Level</th>
               <th class="table-th">T-shirt Status</th>
@@ -147,8 +148,9 @@ async function handleConfirm() {
               class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
             >
               <td class="table-td text-gray-400 text-xs hidden sm:table-cell">{{ (currentPage - 1) * 10 + idx + 1 }}</td>
+              <td class="table-td font-mono text-xs text-gray-500 dark:text-gray-400">{{ d.studentId || '—' }}</td>
               <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
-              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ d.yearLevel }}</td>
+              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
               <td class="table-td">
                 <span :class="d.isReceived ? 'badge-paid' : 'badge-unpaid'">
                   {{ d.isReceived ? 'Received' : 'Not Received' }}
@@ -185,7 +187,7 @@ async function handleConfirm() {
 
             <!-- Empty state -->
             <tr v-if="paginated.length === 0">
-              <td colspan="5" class="table-td text-center text-gray-400 py-10">No paid delegates found.</td>
+              <td colspan="6" class="table-td text-center text-gray-400 py-10">No paid delegates found.</td>
             </tr>
           </tbody>
         </table>
