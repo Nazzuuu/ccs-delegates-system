@@ -4,8 +4,8 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { login, logout, currentUser, isSuperAdmin } from '../composables/useAuth'
 import {
   fetchAppUserByEmail, createAppUser, fetchAppUsers, deleteAppUser, type AppUser,
-  fetchAttEvents,   createAttEvent,   updateAttEvent,   deleteAttEvent,   type AttEvent   as SAttEvent,
-  fetchAttStudents, createAttStudent, updateAttStudent, deleteAttStudent, bulkCreateAttStudents, type AttStudent,
+  fetchAttEvents,   createAttEvent,   updateAttEvent,   deleteAttEvent,   deleteAllAttEvents,  type AttEvent   as SAttEvent,
+  fetchAttStudents, createAttStudent, updateAttStudent, deleteAttStudent, deleteAllAttStudents, bulkCreateAttStudents, type AttStudent,
   fetchAttRecords,  createAttRecord,  deleteAttRecord,  deleteAllAttRecords,  type AttRecord  as SAttRecord,
   fetchAttLogouts,  createAttLogout,  deleteAllAttLogouts, type AttLogout,
   fetchAttWinners,  createAttWinner,  deleteAttWinner,  deleteAllAttWinners,  type AttWinner,
@@ -219,6 +219,7 @@ async function loadAll(silent = false) {
       fetchAttWinners(),
       fetchAttSetting(),
     ])
+    // Only update reactive state when ALL fetches succeed to prevent partial/blank data
     events.value     = evts.map(e => ({ id: e.id, name: e.name, type: e.type, date: e.date, venue: e.venue, status: e.status }))
     students.value   = stus.map(s => ({ id: s.id, studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }))
     attendance.value = recs.map(r => ({ id: r.id, eventId: r.eventId, eventName: r.eventName, studentId: r.studentId, name: r.name, yearLevel: r.yearLevel, dept: r.dept, date: r.date, timeIn: r.timeIn }))
@@ -228,6 +229,8 @@ async function loadAll(silent = false) {
     attEventId.value    = cfg.activeEventId || ''
     raffleEventId.value = cfg.activeEventId || ''
   } catch (e: any) {
+    // Silent refreshes: keep the existing data so the UI doesn't appear blank
+    // Non-silent (initial load): show error to the user
     if (!silent) toast('Failed to load data from server: ' + (e.message ?? ''), 'error')
   } finally {
     if (!silent) isLoading.value = false
@@ -472,9 +475,13 @@ function chooseImportFile() { excelInputEl.value?.click() }
 // Normalize any year level string to canonical "Nth Year" format used in the app
 const YEAR_NORMALIZE_MAP: Record<string, string> = {
   'first year':  '1st Year', '1st year': '1st Year', '1styear': '1st Year', '1': '1st Year',
+  '1st':         '1st Year', 'year 1': '1st Year', 'yr 1': '1st Year', 'yr1': '1st Year',
   'second year': '2nd Year', '2nd year': '2nd Year', '2ndyear': '2nd Year', '2': '2nd Year',
+  '2nd':         '2nd Year', 'year 2': '2nd Year', 'yr 2': '2nd Year', 'yr2': '2nd Year',
   'third year':  '3rd Year', '3rd year': '3rd Year', '3rdyear': '3rd Year', '3': '3rd Year',
+  '3rd':         '3rd Year', 'year 3': '3rd Year', 'yr 3': '3rd Year', 'yr3': '3rd Year',
   'fourth year': '4th Year', '4th year': '4th Year', '4thyear': '4th Year', '4': '4th Year',
+  '4th':         '4th Year', 'year 4': '4th Year', 'yr 4': '4th Year', 'yr4': '4th Year',
 }
 function normalizeYearLevel(raw: string): string {
   const key = raw.trim().toLowerCase()
@@ -493,10 +500,10 @@ function processImportFile(file: File) {
       if (!rows.length) { toast('The file is empty.', 'error'); return }
 
       const header = (rows[0] || []).map((h: any) => String(h || '').trim().toLowerCase())
-      const hasStudentId = header.includes('studentid') || header.includes('student id')
+      const hasStudentId = header.includes('studentid') || header.includes('student id') || header.some(h => h.includes('student') && h.includes('id'))
       const hasName = header.includes('name')
-      const hasYear = header.includes('yearlevel') || header.includes('year level') || header.includes('year')
-      const hasDept = header.includes('dept') || header.includes('department')
+      const hasYear = header.includes('yearlevel') || header.includes('year level') || header.includes('year') || header.some(h => h.includes('year'))
+      const hasDept = header.includes('dept') || header.includes('department') || header.some(h => h.includes('dept'))
 
       const isAttendanceImport = hasStudentId && (header.includes('timein') || header.includes('time in') || header.includes('date'))
       const isStudentImport = hasStudentId && hasName && hasYear && hasDept
@@ -541,16 +548,19 @@ function processImportFile(file: File) {
       } else if (isStudentImport) {
         const list = [...students.value]
         let added = 0, skipped = 0
-        const studentIdIdx = header.findIndex(h => h === 'studentid' || h === 'student id')
+        const studentIdIdx = header.findIndex(h => h === 'studentid' || h === 'student id' || h.includes('student') && h.includes('id'))
         const nameIdx = header.findIndex(h => h === 'name')
-        const yearIdx = header.findIndex(h => h === 'yearlevel' || h === 'year level' || h === 'year')
-        const deptIdx = header.findIndex(h => h === 'dept' || h === 'department')
+        const yearIdx = header.findIndex(h => h === 'yearlevel' || h === 'year level' || h === 'year' || h.includes('year'))
+        const deptIdx = header.findIndex(h => h === 'dept' || h === 'department' || h.includes('dept'))
 
         rows.slice(1).forEach((row: any[]) => {
           const studentId = String(row[studentIdIdx] || '').trim()
           const name = String(row[nameIdx] || '').trim()
-          const yearLevel = normalizeYearLevel(String(row[yearIdx] || '1st Year'))
-          const dept = String(row[deptIdx] || 'CCS').trim()
+          // Only use fallback '1st Year' if the column itself is missing entirely (-1);
+          // if the column exists but the cell is empty, keep it blank so it doesn't silently wrong-assign
+          const rawYear = yearIdx >= 0 ? String(row[yearIdx] ?? '').trim() : ''
+          const yearLevel = normalizeYearLevel(rawYear || '1st Year')
+          const dept = deptIdx >= 0 ? String(row[deptIdx] || 'CCS').trim() : 'CCS'
           if (!studentId || !name) { skipped++; return }
           if (list.find(s => s.studentId === studentId)) { skipped++; return }
           if (list.find(s => s.name.toLowerCase() === name.toLowerCase())) { skipped++; return }
@@ -558,6 +568,8 @@ function processImportFile(file: File) {
         })
         bulkCreateAttStudents(list.filter(s => !students.value.find(x => x.id === s.id)).map(s => ({ studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept })))
           .then(res => {
+            // Update local students state immediately rather than doing a full reload
+            // (full silent reload can briefly show stale/empty data if Strapi is slow)
             loadAll(true)
             toast(`Imported ${res.added} students. ${skipped} skipped.${res.failed.length ? ' Some failed: ' + res.failed.join(', ') : ''}`, 'success')
           })
@@ -850,12 +862,20 @@ async function clearAllData() {
   const ok = await showConfirm('Clear All Data', 'This will permanently delete ALL events, students, attendance records, and raffle data. This action cannot be undone.')
   if (!ok) return
   try {
+    // Delete all data types including events and students (as described in the confirmation dialog)
     await Promise.all([
       deleteAllAttRecords(),
       deleteAllAttLogouts(),
       deleteAllAttWinners(),
+      deleteAllAttEvents(),
+      deleteAllAttStudents(),
     ])
-    await loadAll(true)
+    // Reset local state immediately so the UI reflects the cleared state
+    events.value     = []
+    students.value   = []
+    attendance.value = []
+    logouts.value    = []
+    winners.value    = []
     toast('All data cleared.', 'info')
   } catch (e: any) { toast('Failed to clear data: ' + e.message, 'error') }
 }

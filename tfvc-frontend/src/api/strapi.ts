@@ -288,6 +288,12 @@ export async function deleteAttEvent(id: string): Promise<void> {
   if (!res.ok) throw new Error(`deleteAttEvent failed: ${res.status}`)
 }
 
+/** Delete ALL att-events — fetches all events then deletes each one. */
+export async function deleteAllAttEvents(): Promise<void> {
+  const all = await fetchAttEvents()
+  await Promise.all(all.map(e => deleteAttEvent(e.id)))
+}
+
 // ── att-student ───────────────────────────────────────────────────────────────
 export interface AttStudent {
   id: string          // documentId
@@ -342,6 +348,12 @@ export async function updateAttStudent(id: string, data: Partial<Omit<AttStudent
 export async function deleteAttStudent(id: string): Promise<void> {
   const res = await fetch(`${BASE}/att-students/${id}`, { method: 'DELETE', headers })
   if (!res.ok) throw new Error(`deleteAttStudent failed: ${res.status}`)
+}
+
+/** Delete ALL att-students — fetches all records then deletes each one. */
+export async function deleteAllAttStudents(): Promise<void> {
+  const all = await fetchAttStudents()
+  await Promise.all(all.map(s => deleteAttStudent(s.id)))
 }
 
 export async function bulkCreateAttStudents(rows: Omit<AttStudent, 'id'>[]): Promise<{ added: number; failed: string[] }> {
