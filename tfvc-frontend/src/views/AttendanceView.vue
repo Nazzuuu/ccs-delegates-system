@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+// CCS Attendance System — Strapi Backend (Railway)
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { login, logout, currentUser, isSuperAdmin } from '../composables/useAuth'
 import {
