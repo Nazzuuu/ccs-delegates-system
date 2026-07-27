@@ -1106,8 +1106,26 @@ onMounted(() => {
   <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â• MAIN APP â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div v-else class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
 
-    <!-- SIDEBAR â€” matches CCS Delegates exactly -->
-    <aside :class="['flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-sm transition-all duration-300 ease-in-out flex-shrink-0', sidebarOpen ? 'w-60' : 'w-16']"
+    <!-- Mobile overlay backdrop -->
+    <Transition
+      enter-active-class="transition-opacity duration-200"
+      enter-from-class="opacity-0" enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-200"
+      leave-from-class="opacity-100" leave-to-class="opacity-0">
+      <div
+        v-if="isMobile && sidebarOpen"
+        class="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+        @click="sidebarOpen = false"
+      />
+    </Transition>
+
+    <!-- SIDEBAR -->
+    <aside :class="[
+        'flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-sm transition-all duration-300 ease-in-out flex-shrink-0',
+        isMobile
+          ? 'fixed inset-y-0 left-0 z-40 w-60 ' + (sidebarOpen ? 'translate-x-0' : '-translate-x-full')
+          : (sidebarOpen ? 'w-60' : 'w-16')
+      ]"
       @click.stop>
       <!-- Logo -->
       <div :class="['border-b border-gray-100 dark:border-gray-800 overflow-hidden flex-shrink-0', sidebarOpen ? 'px-5 py-5' : 'px-0 py-4 flex flex-col items-center']">
@@ -1182,7 +1200,7 @@ onMounted(() => {
           <button @click="sidebarOpen = !sidebarOpen" class="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
-          <h2 class="text-sm font-bold text-gray-800 dark:text-white capitalize">{{ activePage }}</h2>
+          <h2 class="text-sm font-bold text-gray-800 dark:text-white capitalize hidden xs:block">{{ activePage }}</h2>
         </div>
         <div class="flex items-center gap-2">
           <button @click="toggleLive()"
@@ -1212,7 +1230,7 @@ onMounted(() => {
       </header>
 
       <!-- Page content -->
-        <main class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 transition-colors duration-200 p-5">
+        <main class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 transition-colors duration-200 p-3 sm:p-5">
 
           <!-- â•â• DASHBOARD â•â• -->
           <!-- Dashboard -->
@@ -1372,7 +1390,8 @@ onMounted(() => {
             <p class="text-xs text-gray-500 dark:text-gray-400">Import CSV can handle attendance-style columns like Student ID, Name, Year Level, Department.</p>
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
               <div v-if="!filteredStudents.length" class="py-12 text-center text-gray-400 text-sm">No students found.</div>
-              <table v-else class="w-full text-sm">
+              <div v-else class="overflow-x-auto">
+              <table class="w-full min-w-[560px] text-sm">
                 <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
                     <th class="px-4 py-3 text-left">Student ID</th>
@@ -1399,6 +1418,7 @@ onMounted(() => {
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
             <!-- Pagination -->
             <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl">
@@ -1432,7 +1452,8 @@ onMounted(() => {
             </div>
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
               <div v-if="!filteredEvents.length" class="py-12 text-center text-gray-400 text-sm">No events found.</div>
-              <table v-else class="w-full text-sm">
+              <div v-else class="overflow-x-auto">
+              <table class="w-full min-w-[540px] text-sm">
                 <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
                     <th class="px-4 py-3 text-left">Name</th>
@@ -1459,6 +1480,7 @@ onMounted(() => {
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
 
@@ -1488,7 +1510,7 @@ onMounted(() => {
             </div>
 
             <!-- Scan tab -->
-            <div v-if="attTab==='scan'" class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            <div v-if="attTab==='scan'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-5 items-start">
               <!-- Left column: Active Event + Scanner -->
               <div class="space-y-4">
                 <!-- Active Event card -->
@@ -1561,7 +1583,8 @@ onMounted(() => {
                 </div>
                 <p class="px-5 py-2 text-xs text-gray-400 border-b border-gray-100 dark:border-gray-800">Chronological list of the most recent scans.</p>
                 <div v-if="!todayLogs.length" class="py-12 text-center text-gray-400 text-sm">No scans yet today.</div>
-                <table v-else class="w-full text-sm">
+                <div v-else class="overflow-x-auto">
+                <table class="w-full min-w-[360px] text-sm">
                   <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 text-xs uppercase tracking-wider">
                     <tr>
                       <th class="px-4 py-3 text-left">Time</th>
@@ -1594,7 +1617,8 @@ onMounted(() => {
               </div>
               <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div v-if="!filteredRecords.length" class="py-12 text-center text-gray-400 text-sm">No records found.</div>
-                <table v-else class="w-full text-sm">
+                <div v-else class="overflow-x-auto">
+                <table class="w-full min-w-[500px] text-sm">
                   <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 text-xs uppercase tracking-wider">
                     <tr>
                       <th class="px-4 py-3 text-left">Student ID</th>
@@ -1630,15 +1654,15 @@ onMounted(() => {
                   <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                   <p class="text-xs uppercase tracking-[0.32em] text-gray-500 dark:text-gray-400 font-semibold">Raffle board</p>
                 </div>
-                <div class="flex items-center gap-3 flex-wrap">
-                  <div class="min-w-[180px]">
+                <div class="flex flex-wrap items-end gap-3 w-full sm:w-auto">
+                  <div class="min-w-[140px] flex-1 sm:flex-none sm:min-w-[180px]">
                     <label class="block text-[11px] font-semibold uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400 mb-2">Event</label>
                     <select v-model="raffleEventId" class="input-search w-full bg-white dark:bg-gray-900">
                       <option value="">— Select event —</option>
                       <option v-for="event in events" :key="event.id" :value="event.id">{{ event.name }}</option>
                     </select>
                   </div>
-                  <div class="min-w-[140px]">
+                  <div class="min-w-[110px] flex-1 sm:flex-none sm:min-w-[140px]">
                     <label class="block text-[11px] font-semibold uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400 mb-2">Year</label>
                     <select v-model="raffleYearFilter" class="input-search w-full bg-white dark:bg-gray-900">
                       <option value="">— All years —</option>
@@ -1648,7 +1672,7 @@ onMounted(() => {
                       <option value="4th Year">4th Year</option>
                     </select>
                   </div>
-                  <div class="w-24">
+                  <div class="w-20 sm:w-24">
                     <label class="block text-[11px] font-semibold uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400 mb-2">Draw</label>
                     <input v-model.number="drawCount" type="number" min="1" max="50" class="input-search w-full text-sm" />
                   </div>
@@ -1663,11 +1687,11 @@ onMounted(() => {
                   <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white">{{ drawLabel }}</p>
                   <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ raffleEventId ? (isDrawing ? 'Choosing winner from pool...' : 'Drawing ' + Math.min(drawCount, rafflePool.length) + ' from ' + rafflePool.length + ' eligible candidate' + (rafflePool.length !== 1 ? 's' : '')) : 'Select an event to begin' }}</p>
                 </div>
-                <div class="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4">
-                  <button @click="doDraw" :disabled="isDrawing || !raffleEventId" class="btn-primary px-8 py-4 text-base font-semibold rounded-2xl disabled:opacity-60 disabled:cursor-not-allowed">
+                <div class="mt-8 sm:mt-10 flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4">
+                  <button @click="doDraw" :disabled="isDrawing || !raffleEventId" class="btn-primary px-8 py-3 sm:py-4 text-base font-semibold rounded-2xl disabled:opacity-60 disabled:cursor-not-allowed w-full sm:w-auto">
                     {{ isDrawing ? 'Drawing...' : 'DRAW' }}
                   </button>
-                  <button @click="clearWinners" :disabled="isDrawing" class="btn-secondary px-6 py-4 text-base rounded-2xl">Clear Winners</button>
+                  <button @click="clearWinners" :disabled="isDrawing" class="btn-secondary px-6 py-3 sm:py-4 text-base rounded-2xl w-full sm:w-auto">Clear Winners</button>
                 </div>
               </div>
             </div>
@@ -1690,7 +1714,8 @@ onMounted(() => {
                 <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">All Winners</h3>
               </div>
               <div v-if="!winners.length" class="py-10 text-center text-gray-400 text-sm">No winners yet.</div>
-              <table v-else class="w-full text-sm">
+              <div v-else class="overflow-x-auto">
+              <table class="w-full min-w-[480px] text-sm">
                 <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
                     <th class="px-4 py-3 text-left">Name</th>
@@ -1843,22 +1868,22 @@ onMounted(() => {
                                 <svg class="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
                                 <h3 class="text-sm font-bold text-red-600 dark:text-red-400">Danger Zone</h3>
                               </div>
-                              <div class="flex items-center justify-between gap-4 pb-3 border-b border-red-100 dark:border-red-900/30">
+                              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-red-100 dark:border-red-900/30">
                                 <div>
                                   <p class="text-sm font-medium text-gray-800 dark:text-white">Clear Attendance Records</p>
                                   <p class="text-xs text-orange-500 dark:text-orange-400 mt-0.5">Delete all attendance logs only. Students and events stay intact.</p>
                                 </div>
-                                <button @click="clearAttendanceOnly" class="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors">
+                                <button @click="clearAttendanceOnly" class="sm:flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors w-full sm:w-auto">
                                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                   Clear Attendance
                                 </button>
                               </div>
-                              <div class="flex items-center justify-between gap-4 pt-1">
+                              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
                                 <div>
                                   <p class="text-sm font-medium text-gray-800 dark:text-white">Clear All Data</p>
                                   <p class="text-xs text-red-500 dark:text-red-400 mt-0.5">Permanently delete all events, students, attendance records, and raffle data. <span class="font-semibold">This action cannot be undone.</span></p>
                                 </div>
-                                <button @click="clearAllData" class="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors">
+                                <button @click="clearAllData" class="sm:flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors w-full sm:w-auto">
                                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                   Clear Database
                                 </button>
@@ -1873,8 +1898,8 @@ onMounted(() => {
 
     <!-- â•â• STUDENT MODAL â•â• -->
     <!-- Dashboard Detail Modal -->
-    <div v-if="dashModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4" @click.self="closeDashModal">
-      <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+    <div v-if="dashModal.show" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4" @click.self="closeDashModal">
+      <div class="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh]">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
           <div>
             <h2 class="text-base font-bold text-gray-900 dark:text-white">{{ dashModalTitle }}</h2>
@@ -1884,14 +1909,17 @@ onMounted(() => {
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        <div class="flex flex-wrap gap-2 px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-          <input v-model="dashModalSearch" type="text" placeholder="Search name or ID..." class="input-search flex-1 min-w-[160px] text-sm" />
-          <select v-model="dashModalYear" class="input-search w-36 text-sm"><option value="">All Years</option><option value="1st Year">1st Year</option><option value="2nd Year">2nd Year</option><option value="3rd Year">3rd Year</option><option value="4th Year">4th Year</option></select>
-          <select v-model="dashModalSort" class="input-search w-36 text-sm"><option value="name">Sort by Name</option><option value="id">Sort by ID</option><option value="year">Sort by Year</option></select>
+        <div class="flex flex-wrap gap-2 px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+          <input v-model="dashModalSearch" type="text" placeholder="Search name or ID..." class="input-search w-full sm:flex-1 sm:min-w-[160px] text-sm" />
+          <div class="flex gap-2 w-full sm:w-auto">
+            <select v-model="dashModalYear" class="input-search flex-1 sm:w-36 text-sm"><option value="">All Years</option><option value="1st Year">1st Year</option><option value="2nd Year">2nd Year</option><option value="3rd Year">3rd Year</option><option value="4th Year">4th Year</option></select>
+            <select v-model="dashModalSort" class="input-search flex-1 sm:w-36 text-sm"><option value="name">Sort by Name</option><option value="id">Sort by ID</option><option value="year">Sort by Year</option></select>
+          </div>
         </div>
         <div class="overflow-y-auto flex-1">
           <div v-if="!dashModalRows.length" class="py-12 text-center text-gray-400 text-sm">No records found.</div>
-          <table v-else class="w-full text-sm">
+          <div v-else class="overflow-x-auto">
+          <table class="w-full min-w-[500px] text-sm">
             <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10"><tr>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Student ID</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
@@ -1911,12 +1939,13 @@ onMounted(() => {
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>
 
-    <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-      <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4">
+      <div class="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[90vh]">
         <div class="space-y-2">
           <h2 class="text-lg font-bold text-gray-900 dark:text-white">Import Student / Attendance File</h2>
           <p class="text-sm text-gray-500 dark:text-gray-400">Upload a CSV or Excel file with student records or attendance rows.</p>
@@ -1945,8 +1974,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="showStuModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-      <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <div v-if="showStuModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4">
+      <div class="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[90vh]">
         <div class="space-y-2">
           <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ editStuId ? 'Edit Student' : 'Add Student' }}</h2>
           <p class="text-sm text-gray-500 dark:text-gray-400">Use this form to add or update student records. Give each student a unique ID so attendance tracking and raffle selection work correctly.</p>
@@ -1977,8 +2006,8 @@ onMounted(() => {
     </div>
 
     <!-- ══ EVENT MODAL ══ -->
-    <div v-if="showEvtModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-      <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <div v-if="showEvtModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4">
+      <div class="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[90vh]">
         <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ editEvtId ? 'Edit Event' : 'Add Event' }}</h2>
         <div>
           <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Event Name</label>
@@ -2004,8 +2033,8 @@ onMounted(() => {
     </div>
 
     <!-- ══ CONFIRM DIALOG ══ -->
-    <div v-if="confirmDialog.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-      <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <div v-if="confirmDialog.show" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4">
+      <div class="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm p-5 sm:p-6 space-y-4">
         <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ confirmDialog.title }}</h2>
         <p class="text-sm text-gray-600 dark:text-gray-400">{{ confirmDialog.message }}</p>
         <div class="flex gap-3 pt-1">
@@ -2016,7 +2045,7 @@ onMounted(() => {
     </div>
 
     <!-- ══ TOASTS ══ -->
-    <div class="fixed bottom-5 right-5 z-[60] flex flex-col gap-2 pointer-events-none">
+    <div class="fixed bottom-4 right-3 sm:bottom-5 sm:right-5 z-[60] flex flex-col gap-2 pointer-events-none max-w-[calc(100vw-1.5rem)] sm:max-w-xs">
       <transition-group name="toast">
         <div v-for="t in toasts" :key="t.id"
           :class="['px-4 py-3 rounded-xl shadow-lg text-sm font-medium pointer-events-auto max-w-xs',

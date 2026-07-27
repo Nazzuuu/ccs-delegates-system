@@ -142,10 +142,10 @@ async function handleRegister() {
     </div>
 
     <!-- ── Right form panel ──────────────────────────────────── -->
-    <div class="flex-1 flex items-center justify-center bg-white dark:bg-gray-950 px-8 relative">
+    <div class="flex-1 flex items-center justify-center bg-white dark:bg-gray-950 px-4 sm:px-8 relative overflow-y-auto">
 
       <!-- Attendance button top-right -->
-      <div class="absolute top-5 right-6">
+      <div class="absolute top-4 right-3 sm:top-5 sm:right-6">
         <button
           type="button"
           @click="handleAttendance"
@@ -168,7 +168,7 @@ async function handleRegister() {
         </button>
       </div>
 
-      <div class="w-full max-w-sm">
+      <div class="w-full max-w-sm py-16 sm:py-0">
 
         <!-- Mobile logo -->
         <div class="flex items-center gap-2 mb-8 lg:hidden">
