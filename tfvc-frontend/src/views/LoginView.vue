@@ -15,7 +15,8 @@ const password    = ref('')
 const showPass    = ref(false)
 const errorMsg    = ref('')
 const successMsg  = ref('')
-const isLoading   = ref(false)
+const isLoading      = ref(false)
+const attBtnLoading  = ref(false)
 
 // ── Register-only fields ─────────────────────────────────────────────────────
 const confirmPassword = ref('')
@@ -27,6 +28,14 @@ function switchMode(m: 'login' | 'register') {
   successMsg.value = ''
   password.value   = ''
   confirmPassword.value = ''
+}
+
+// ── Attendance shortcut ──────────────────────────────────────────────────────
+async function handleAttendance() {
+  if (attBtnLoading.value) return
+  attBtnLoading.value = true
+  await new Promise(r => setTimeout(r, 600))
+  router.push('/attendance')
 }
 
 // ── Login ────────────────────────────────────────────────────────────────────
@@ -133,7 +142,32 @@ async function handleRegister() {
     </div>
 
     <!-- ── Right form panel ──────────────────────────────────── -->
-    <div class="flex-1 flex items-center justify-center bg-white dark:bg-gray-950 px-8">
+    <div class="flex-1 flex items-center justify-center bg-white dark:bg-gray-950 px-8 relative">
+
+      <!-- Attendance button top-right -->
+      <div class="absolute top-5 right-6">
+        <button
+          type="button"
+          @click="handleAttendance"
+          :disabled="attBtnLoading"
+          :class="[
+            'inline-flex items-center gap-2 bg-sync-green hover:bg-green-600 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow',
+            'transition-all duration-150 active:scale-95',
+            attBtnLoading ? 'animate-pulse cursor-not-allowed opacity-80' : '',
+          ]">
+          <!-- Spinner shown while loading -->
+          <svg v-if="attBtnLoading" class="animate-spin w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+          <!-- Check icon shown at rest -->
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          {{ attBtnLoading ? 'Opening...' : 'Attendance' }}
+        </button>
+      </div>
+
       <div class="w-full max-w-sm">
 
         <!-- Mobile logo -->

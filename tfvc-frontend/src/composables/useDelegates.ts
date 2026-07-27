@@ -23,7 +23,9 @@ export async function loadDelegates(force = false, silent = false) {
   error.value = null
   try {
     const fresh = await fetchAllDelegates()
-    delegates.value = fresh
+    // Replace array contents in-place to avoid triggering unnecessary
+    // reactive recomputes in components that track currentPage
+    delegates.value.splice(0, delegates.value.length, ...fresh)
     loaded = true
   } catch (e: any) {
     error.value = e.message ?? 'Failed to load delegates'
@@ -38,13 +40,15 @@ export function useDelegates() {
   const filterStatus = ref<'All' | 'Paid' | 'Not Paid'>('All')
   const filterYear = ref('All')
 
-  const yearLevels = ['All', 'First Year', 'Second Year', 'Third Year', 'Fourth Year']
+  const yearLevels = ['All', '1st Year', '2nd Year', '3rd Year', '4th Year']
 
   const filtered = computed(() =>
     delegates.value.filter(d => {
       const matchSearch = d.name.toLowerCase().includes(searchQuery.value.toLowerCase())
       const matchStatus = filterStatus.value === 'All' || d.status === filterStatus.value
-      const matchYear = filterYear.value === 'All' || d.yearLevel === filterYear.value
+      const matchYear = filterYear.value === 'All' ||
+        d.yearLevel.toLowerCase().replace(/\s+/g, ' ').trim() ===
+        filterYear.value.toLowerCase().replace(/\s+/g, ' ').trim()
       return matchSearch && matchStatus && matchYear && d.status !== 'Backout'
     })
   )
@@ -94,8 +98,15 @@ export function useDelegates() {
   }
 
   async function addDelegate(name: string, yearLevel: string) {
+    const trimmedName = name.trim().toUpperCase()
+    const exists = delegates.value.find(
+      d => d.name.toUpperCase() === trimmedName
+    )
+    if (exists) {
+      throw new Error(`"${trimmedName}" already exists in the list (${exists.yearLevel}).`)
+    }
     const created = await createDelegate({
-      name: name.toUpperCase(),
+      name: trimmedName,
       yearLevel,
       status: 'Not Paid',
       isPaid: false,

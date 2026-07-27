@@ -25,7 +25,8 @@ const emit = defineEmits<{
       leave-to-class="opacity-0 scale-95"
     >
       <div
-        v-if="open"
+        
+      v-if="open"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
         @click.self="emit('cancel')"
       >

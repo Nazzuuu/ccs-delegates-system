@@ -18,8 +18,19 @@ const paidCount    = computed(() => delegates.value.filter(d => d.status === 'Pa
 const unpaidCount  = computed(() => delegates.value.filter(d => d.status === 'Not Paid').length)
 const backoutCount = computed(() => delegates.value.filter(d => d.status === 'Backout').length)
 
-function prevPage() { if (currentPage.value > 1) currentPage.value-- }
-function nextPage() { if (currentPage.value < totalPages.value) currentPage.value++ }
+let _pageChanging = false
+function prevPage() {
+  if (_pageChanging || currentPage.value <= 1) return
+  _pageChanging = true
+  currentPage.value--
+  setTimeout(() => { _pageChanging = false }, 300)
+}
+function nextPage() {
+  if (_pageChanging || currentPage.value >= totalPages.value) return
+  _pageChanging = true
+  currentPage.value++
+  setTimeout(() => { _pageChanging = false }, 300)
+}
 
 // ── Confirm dialog state ──────────────────────────────────────────────────
 type ActionType = 'paid' | 'undo' | 'backout'

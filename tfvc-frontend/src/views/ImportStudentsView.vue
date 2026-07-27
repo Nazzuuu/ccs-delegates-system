@@ -23,8 +23,19 @@ const filtered   = computed(() => delegates.value.filter(d => d.name.toLowerCase
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
 const paginated  = computed(() => filtered.value.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE))
 
-function prevPage() { if (currentPage.value > 1) currentPage.value-- }
-function nextPage() { if (currentPage.value < totalPages.value) currentPage.value++ }
+let _pageChanging = false
+function prevPage() {
+  if (_pageChanging || currentPage.value <= 1) return
+  _pageChanging = true
+  currentPage.value--
+  setTimeout(() => { _pageChanging = false }, 300)
+}
+function nextPage() {
+  if (_pageChanging || currentPage.value >= totalPages.value) return
+  _pageChanging = true
+  currentPage.value++
+  setTimeout(() => { _pageChanging = false }, 300)
+}
 function openModal() { newName.value = ''; newYear.value = 'First Year'; addError.value = ''; showModal.value = true }
 
 // ── Add confirm ───────────────────────────────────────────────────────────
@@ -125,6 +136,7 @@ function onFileChange(e: Event) {
       const headers: string[] = headerRow.map((h: any) => String(h).toLowerCase().trim())
       const nameCol = headers.findIndex(h => h.includes('name'))
       const yearCol = headers.findIndex(h => h.includes('year'))
+      
 
       if (nameCol === -1) { importParseError.value = 'Could not find a "name" column in the file.'; return }
       if (yearCol === -1) { importParseError.value = 'Could not find a "year" column in the file.'; return }

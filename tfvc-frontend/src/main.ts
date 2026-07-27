@@ -12,11 +12,13 @@ import ReceivedView     from './views/ReceivedView.vue'
 import ImportStudentsView from './views/ImportStudentsView.vue'
 import BackoutListView  from './views/BackoutListView.vue'
 import SettingsView     from './views/SettingsView.vue'
+import AttendanceView   from './views/AttendanceView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/login',     component: LoginView,          name: 'login',    meta: { public: true } },
+    { path: '/login',      component: LoginView,       name: 'login',      meta: { public: true } },
+    { path: '/attendance', component: AttendanceView,  name: 'attendance', meta: { public: true } },
     { path: '/',          redirect: '/dashboard' },
     { path: '/dashboard', component: DashboardView,      name: 'dashboard' },
     { path: '/students',  component: StudentsView,        name: 'students' },
