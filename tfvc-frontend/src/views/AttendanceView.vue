@@ -230,6 +230,18 @@ async function loadAll(silent = false) {
       events.value = evtsR.value.map(e => ({ id: e.id, name: e.name, type: e.type, date: e.date, venue: e.venue, status: e.status }))
     if (stusR.status === 'fulfilled')
       students.value = stusR.value.map(s => ({ id: s.id, studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept, paidDay: s.paidDay ?? null }))
+
+    // ── Sync paidRows in real-time from the freshly fetched att-students ──
+    // This makes paid checkbox changes on any device reflect everywhere within 1s
+    if (stusR.status === 'fulfilled' && paidRows.value.length > 0) {
+      const stuMap = new Map(stusR.value.map(s => [s.name.toUpperCase().trim(), s.paidDay ?? null]))
+      paidRows.value = paidRows.value.map(r => ({
+        ...r,
+        status: stuMap.has(r.name.toUpperCase().trim())
+          ? stuMap.get(r.name.toUpperCase().trim()) ?? null
+          : r.status,
+      }))
+    }
     if (recsR.status === 'fulfilled')
       attendance.value = recsR.value.map(r => ({ id: r.id, eventId: r.eventId, eventName: r.eventName, studentId: r.studentId, name: r.name, yearLevel: r.yearLevel, dept: r.dept, date: r.date, timeIn: r.timeIn }))
     if (logsR.status === 'fulfilled')
@@ -919,6 +931,9 @@ async function clearAllData() {
     attendance.value = []
     logouts.value    = []
     winners.value    = []
+    // Also clear paid data — paidRows and the localStorage paidDay map
+    paidRows.value   = []
+    localStorage.removeItem(PAID_DAY_KEY)
     toast('All data cleared.', 'info')
   } catch (e: any) { toast('Failed to clear data: ' + e.message, 'error') }
 }
