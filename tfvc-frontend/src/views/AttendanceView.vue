@@ -209,6 +209,8 @@ function handleScanInput() {
 const isLoading = ref(false)
 
 async function loadAll(silent = false) {
+  if (loadAllInProgress) return  // prevent overlapping fetches
+  loadAllInProgress = true
   if (!silent) isLoading.value = true
   try {
     // Use allSettled so a slow/failing collection doesn't block the others from updating
@@ -243,22 +245,25 @@ async function loadAll(silent = false) {
   } catch (e: any) {
     if (!silent) toast('Failed to load data from server: ' + (e.message ?? ''), 'error')
   } finally {
+    loadAllInProgress = false
     if (!silent) isLoading.value = false
     if (!silent) focusScanInput()
   }
 }
 
-// ── Auto-refresh: silently poll Strapi every 2 seconds ──
+// ── Auto-refresh: silently poll Strapi every 5 seconds ──
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 const lastSynced = ref('')
+let loadAllInProgress = false  // lock to prevent overlapping fetches
 
 function startAutoRefresh() {
   if (autoRefreshTimer) return
   isLive.value = true
   autoRefreshTimer = setInterval(async () => {
+    if (loadAllInProgress) return  // skip this tick if previous fetch is still running
     await loadAll(true)
     lastSynced.value = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  }, 2000)
+  }, 5000)
 }
 
 function stopAutoRefresh() {

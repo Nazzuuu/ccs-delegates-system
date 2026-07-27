@@ -33,7 +33,7 @@ function mapEntry(d: any): StrapiDelegate {
 
 /** Fetch ALL delegates from Strapi (handles pagination automatically). */
 export async function fetchAllDelegates(): Promise<StrapiDelegate[]> {
-  const PAGE = 100
+  const PAGE = 500
   let page = 1
   const all: StrapiDelegate[] = []
 
@@ -45,7 +45,7 @@ export async function fetchAllDelegates(): Promise<StrapiDelegate[]> {
     if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
     const json = await res.json()
     all.push(...json.data.map(mapEntry))
-    if (all.length >= json.meta.pagination.total) break
+    if (page >= json.meta.pagination.pageCount) break
     page++
   }
 
@@ -314,7 +314,7 @@ function mapAttStudent(d: any): AttStudent {
 }
 
 export async function fetchAttStudents(): Promise<AttStudent[]> {
-  const PAGE = 200
+  const PAGE = 500
   let page = 1
   const all: AttStudent[] = []
   while (true) {
@@ -322,7 +322,7 @@ export async function fetchAttStudents(): Promise<AttStudent[]> {
     if (!res.ok) throw new Error(`fetchAttStudents failed: ${res.status}`)
     const json = await res.json()
     all.push(...json.data.map(mapAttStudent))
-    if (all.length >= json.meta.pagination.total) break
+    if (page >= json.meta.pagination.pageCount) break
     page++
   }
   return all
@@ -397,7 +397,7 @@ function mapAttRecord(d: any): AttRecord {
 }
 
 export async function fetchAttRecords(): Promise<AttRecord[]> {
-  const PAGE = 200
+  const PAGE = 500
   let page = 1
   const all: AttRecord[] = []
   while (true) {
@@ -405,7 +405,7 @@ export async function fetchAttRecords(): Promise<AttRecord[]> {
     if (!res.ok) throw new Error(`fetchAttRecords failed: ${res.status}`)
     const json = await res.json()
     all.push(...json.data.map(mapAttRecord))
-    if (all.length >= json.meta.pagination.total) break
+    if (page >= json.meta.pagination.pageCount) break
     page++
   }
   return all
@@ -458,7 +458,7 @@ function mapAttLogout(d: any): AttLogout {
 }
 
 export async function fetchAttLogouts(): Promise<AttLogout[]> {
-  const PAGE = 200
+  const PAGE = 500
   let page = 1
   const all: AttLogout[] = []
   while (true) {
@@ -466,7 +466,7 @@ export async function fetchAttLogouts(): Promise<AttLogout[]> {
     if (!res.ok) throw new Error(`fetchAttLogouts failed: ${res.status}`)
     const json = await res.json()
     all.push(...json.data.map(mapAttLogout))
-    if (all.length >= json.meta.pagination.total) break
+    if (page >= json.meta.pagination.pageCount) break
     page++
   }
   return all
@@ -512,7 +512,7 @@ function mapAttWinner(d: any): AttWinner {
 }
 
 export async function fetchAttWinners(): Promise<AttWinner[]> {
-  const PAGE = 200
+  const PAGE = 500
   let page = 1
   const all: AttWinner[] = []
   while (true) {
@@ -520,7 +520,7 @@ export async function fetchAttWinners(): Promise<AttWinner[]> {
     if (!res.ok) throw new Error(`fetchAttWinners failed: ${res.status}`)
     const json = await res.json()
     all.push(...json.data.map(mapAttWinner))
-    if (all.length >= json.meta.pagination.total) break
+    if (page >= json.meta.pagination.pageCount) break
     page++
   }
   return all

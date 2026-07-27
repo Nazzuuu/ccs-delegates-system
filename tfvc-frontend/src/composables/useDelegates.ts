@@ -40,7 +40,7 @@ export function useDelegates() {
   const filterStatus = ref<'All' | 'Paid' | 'Not Paid'>('All')
   const filterYear = ref('All')
 
-  const yearLevels = ['All', '1st Year', '2nd Year', '3rd Year', '4th Year']
+  const yearLevels = ['All', 'First Year', 'Second Year', 'Third Year', 'Fourth Year']
 
   const filtered = computed(() =>
     delegates.value.filter(d => {
