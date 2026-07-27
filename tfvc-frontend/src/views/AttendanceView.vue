@@ -211,7 +211,8 @@ const isLoading = ref(false)
 async function loadAll(silent = false) {
   if (!silent) isLoading.value = true
   try {
-    const [evts, stus, recs, logs, wins, cfg] = await Promise.all([
+    // Use allSettled so a slow/failing collection doesn't block the others from updating
+    const [evtsR, stusR, recsR, logsR, winsR, cfgR] = await Promise.allSettled([
       fetchAttEvents(),
       fetchAttStudents(),
       fetchAttRecords(),
@@ -219,18 +220,27 @@ async function loadAll(silent = false) {
       fetchAttWinners(),
       fetchAttSetting(),
     ])
-    // Only update reactive state when ALL fetches succeed to prevent partial/blank data
-    events.value     = evts.map(e => ({ id: e.id, name: e.name, type: e.type, date: e.date, venue: e.venue, status: e.status }))
-    students.value   = stus.map(s => ({ id: s.id, studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }))
-    attendance.value = recs.map(r => ({ id: r.id, eventId: r.eventId, eventName: r.eventName, studentId: r.studentId, name: r.name, yearLevel: r.yearLevel, dept: r.dept, date: r.date, timeIn: r.timeIn }))
-    logouts.value    = logs.map(l => ({ id: l.id, eventId: l.eventId, eventName: l.eventName, studentId: l.studentId, name: l.name, yearLevel: l.yearLevel, dept: l.dept, date: l.date, timeOut: l.timeOut }))
-    winners.value    = wins.map(w => ({ id: w.id, studentId: w.studentId, name: w.name, yearLevel: w.yearLevel, eventId: w.eventId, eventName: w.eventName, drawDate: w.drawDate }))
-    settings.value   = { ...settings.value, ...cfg }
-    attEventId.value    = cfg.activeEventId || ''
-    raffleEventId.value = cfg.activeEventId || ''
+
+    if (evtsR.status === 'fulfilled')
+      events.value = evtsR.value.map(e => ({ id: e.id, name: e.name, type: e.type, date: e.date, venue: e.venue, status: e.status }))
+    if (stusR.status === 'fulfilled')
+      students.value = stusR.value.map(s => ({ id: s.id, studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }))
+    if (recsR.status === 'fulfilled')
+      attendance.value = recsR.value.map(r => ({ id: r.id, eventId: r.eventId, eventName: r.eventName, studentId: r.studentId, name: r.name, yearLevel: r.yearLevel, dept: r.dept, date: r.date, timeIn: r.timeIn }))
+    if (logsR.status === 'fulfilled')
+      logouts.value = logsR.value.map(l => ({ id: l.id, eventId: l.eventId, eventName: l.eventName, studentId: l.studentId, name: l.name, yearLevel: l.yearLevel, dept: l.dept, date: l.date, timeOut: l.timeOut }))
+    if (winsR.status === 'fulfilled')
+      winners.value = winsR.value.map(w => ({ id: w.id, studentId: w.studentId, name: w.name, yearLevel: w.yearLevel, eventId: w.eventId, eventName: w.eventName, drawDate: w.drawDate }))
+    if (cfgR.status === 'fulfilled') {
+      settings.value   = { ...settings.value, ...cfgR.value }
+      attEventId.value    = cfgR.value.activeEventId || ''
+      raffleEventId.value = cfgR.value.activeEventId || ''
+    }
+
+    // If ALL failed, likely a network issue — show error only on non-silent load
+    const allFailed = [evtsR, stusR, recsR, logsR, winsR, cfgR].every(r => r.status === 'rejected')
+    if (allFailed && !silent) toast('Failed to load data from server.', 'error')
   } catch (e: any) {
-    // Silent refreshes: keep the existing data so the UI doesn't appear blank
-    // Non-silent (initial load): show error to the user
     if (!silent) toast('Failed to load data from server: ' + (e.message ?? ''), 'error')
   } finally {
     if (!silent) isLoading.value = false
@@ -238,13 +248,17 @@ async function loadAll(silent = false) {
   }
 }
 
-// ── Auto-refresh: silently poll Strapi every 3 seconds ──
+// ── Auto-refresh: silently poll Strapi every 2 seconds ──
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
+const lastSynced = ref('')
 
 function startAutoRefresh() {
   if (autoRefreshTimer) return
   isLive.value = true
-  autoRefreshTimer = setInterval(() => loadAll(true), 3000)
+  autoRefreshTimer = setInterval(async () => {
+    await loadAll(true)
+    lastSynced.value = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }, 2000)
 }
 
 function stopAutoRefresh() {
@@ -1223,12 +1237,13 @@ onMounted(() => {
             :class="['flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border transition-all duration-200',
               isLive
                 ? 'bg-green-500 border-green-500 text-white shadow-sm shadow-green-200 dark:shadow-green-900'
-                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800']">
+                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800']"
+            :title="isLive ? `Auto-syncing every 2s. Last sync: ${lastSynced || 'pending...'}. Click to refresh now.` : 'Auto-sync offline. Click to refresh.'">
             <svg :class="['w-3.5 h-3.5', isLive ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            <span v-if="isLive" title="Auto-syncing every 3 seconds. Click to refresh now.">Live</span>
-            <span v-else title="Auto-sync is off. Click to refresh.">Offline</span>
+            <span v-if="isLive">Live</span>
+            <span v-else>Offline</span>
           </button>
           <button @click="toggleDark()" class="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <svg v-if="!isDark" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
