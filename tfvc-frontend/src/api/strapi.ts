@@ -301,6 +301,7 @@ export interface AttStudent {
   name: string
   yearLevel: string
   dept: string
+  paidDay?: 'First Day' | 'Second Day' | null
 }
 
 function mapAttStudent(d: any): AttStudent {
@@ -310,6 +311,7 @@ function mapAttStudent(d: any): AttStudent {
     name: d.name ?? '',
     yearLevel: d.yearLevel ?? '',
     dept: d.dept ?? '',
+    paidDay: d.paidDay ?? null,
   }
 }
 

@@ -13,6 +13,7 @@
     "studentId":  { "type": "string", "required": true },
     "name":       { "type": "string", "required": true },
     "yearLevel":  { "type": "string", "required": true },
-    "dept":       { "type": "string" }
+    "dept":       { "type": "string" },
+    "paidDay":    { "type": "enumeration", "enum": ["First Day", "Second Day"] }
   }
 }

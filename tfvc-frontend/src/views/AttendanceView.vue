@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 // CCS Attendance System — Strapi Backend (Railway)
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { login, logout, currentUser, isSuperAdmin } from '../composables/useAuth'
@@ -10,11 +10,12 @@ import {
   fetchAttLogouts,  createAttLogout,  deleteAllAttLogouts, type AttLogout,
   fetchAttWinners,  createAttWinner,  deleteAttWinner,  deleteAllAttWinners,  type AttWinner,
   fetchAttSetting,  saveAttSetting,   type AttSetting,
+  fetchAllDelegates, updateDelegate, type StrapiDelegate,
 } from '../api/strapi'
 
 // Local interface aliases (kept for backward compat with template)
 interface AttEvent  { id: string; name: string; type: string; date: string; venue: string; status: string }
-interface Student   { id: string; studentId: string; name: string; yearLevel: string; dept: string }
+interface Student   { id: string; studentId: string; name: string; yearLevel: string; dept: string; paidDay?: 'First Day' | 'Second Day' | null }
 interface AttRecord { id: string; eventId: string; eventName: string; studentId: string; name: string; yearLevel: string; dept: string; date: string; timeIn: string }
 interface LogoutRecord { id: string; eventId: string; eventName: string; studentId: string; name: string; yearLevel: string; dept: string; date: string; timeOut: string }
 interface Winner    { id: string; studentId: string; name: string; yearLevel: string; eventId: string; eventName: string; drawDate: string }
@@ -119,7 +120,7 @@ const confettiPieces = Array.from({ length: 60 }, (_, i) => ({
   size: 6 + Math.random() * 8
 }))
 
-type PageKey = 'dashboard'|'students'|'events'|'attendance'|'raffle'|'settings'
+type PageKey = 'dashboard'|'students'|'events'|'attendance'|'raffle'|'paid'|'settings'
 const activePage  = ref<PageKey>('dashboard')
 const sidebarOpen = ref(true)
 const isMobile    = ref(false)
@@ -142,6 +143,8 @@ const navItems: Array<{ key: PageKey; label: string; icon: string }> = [
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>` },
   { key: 'raffle',     label: 'Raffle',
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/>` },
+  { key: 'paid',       label: 'Paid',
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>` },
 ]
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }
@@ -226,7 +229,7 @@ async function loadAll(silent = false) {
     if (evtsR.status === 'fulfilled')
       events.value = evtsR.value.map(e => ({ id: e.id, name: e.name, type: e.type, date: e.date, venue: e.venue, status: e.status }))
     if (stusR.status === 'fulfilled')
-      students.value = stusR.value.map(s => ({ id: s.id, studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }))
+      students.value = stusR.value.map(s => ({ id: s.id, studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept, paidDay: s.paidDay ?? null }))
     if (recsR.status === 'fulfilled')
       attendance.value = recsR.value.map(r => ({ id: r.id, eventId: r.eventId, eventName: r.eventName, studentId: r.studentId, name: r.name, yearLevel: r.yearLevel, dept: r.dept, date: r.date, timeIn: r.timeIn }))
     if (logsR.status === 'fulfilled')
@@ -449,6 +452,7 @@ async function deleteEvent(id: string) {
 
 const stuSearch     = ref('')
 const stuYearFilter = ref('')
+const stuDayFilter  = ref<'All' | 'First Day' | 'Second Day'>('All')
 const showStuModal  = ref(false)
 const editStuId     = ref<string|null>(null)
 const stuForm = ref<{ studentId: string; name: string; yearLevel: string; dept: string }>({ studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' })
@@ -457,11 +461,33 @@ const excelInputEl  = ref<HTMLInputElement|null>(null)
 const currentStudentPage = ref(1)
 const studentsPerPage = ref(8)
 
+// Map from studentId → day status.
+// Priority: paidRows (in-memory this session) > students[].paidDay (Strapi, persistent) > localStorage (offline fallback)
+const paidDayMap = computed(() => {
+  const m = new Map<string, 'First Day' | 'Second Day'>()
+  // 1. localStorage fallback (always available, even before Strapi schema is deployed)
+  const stored = loadPaidDayFromStorage()
+  for (const [sid, day] of Object.entries(stored)) {
+    m.set(sid, day as 'First Day' | 'Second Day')
+  }
+  // 2. students[] from Strapi (overrides localStorage if paidDay field is live)
+  for (const s of students.value) {
+    if (s.paidDay) m.set(s.studentId, s.paidDay)
+  }
+  // 3. paidRows (most recent in-session state overrides all)
+  for (const r of paidRows.value) {
+    if (r.status) m.set(r.studentId, r.status)
+  }
+  return m
+})
+
 const filteredStudents = computed(() =>
   students.value.filter(s => {
     const q = stuSearch.value.toLowerCase()
-    return (!q || s.studentId.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)) &&
-           (!stuYearFilter.value || s.yearLevel.toLowerCase().trim() === stuYearFilter.value.toLowerCase().trim())
+    const matchSearch = !q || s.studentId.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
+    const matchYear   = !stuYearFilter.value || s.yearLevel.toLowerCase().trim() === stuYearFilter.value.toLowerCase().trim()
+    const matchDay    = stuDayFilter.value === 'All' || paidDayMap.value.get(s.studentId) === stuDayFilter.value
+    return matchSearch && matchYear && matchDay
   })
 )
 const studentPageCount = computed(() => Math.max(1, Math.ceil(filteredStudents.value.length / studentsPerPage.value)))
@@ -469,7 +495,7 @@ const studentPageStart = computed(() => filteredStudents.value.length ? (current
 const studentPageEnd   = computed(() => Math.min(filteredStudents.value.length, currentStudentPage.value * studentsPerPage.value))
 const paginatedStudents = computed(() => filteredStudents.value.slice((currentStudentPage.value - 1) * studentsPerPage.value, currentStudentPage.value * studentsPerPage.value))
 
-watch([stuSearch, stuYearFilter], () => { currentStudentPage.value = 1 })
+watch([stuSearch, stuYearFilter, stuDayFilter], () => { currentStudentPage.value = 1 })
 watch(filteredStudents, () => {
   if (currentStudentPage.value > studentPageCount.value) {
     currentStudentPage.value = studentPageCount.value
@@ -606,7 +632,7 @@ function saveStudent() {
     updateAttStudent(editStuId.value, { studentId: stuForm.value.studentId, name: stuForm.value.name, yearLevel: stuForm.value.yearLevel, dept: stuForm.value.dept })
       .then(() => {
         const i = students.value.findIndex(s => s.id === editStuId.value)
-        if (i !== -1) students.value[i] = { id: editStuId.value!, ...stuForm.value }
+        if (i !== -1) students.value[i] = { ...students.value[i], id: editStuId.value!, ...stuForm.value }
         toast('Student updated.', 'success')
       })
       .catch(e => toast(e.message, 'error'))
@@ -615,7 +641,7 @@ function saveStudent() {
     if (students.value.find(s => s.name.toLowerCase() === stuForm.value.name.trim().toLowerCase())) { toast(`"${stuForm.value.name.trim()}" already exists.`, 'error'); return }
     createAttStudent({ studentId: stuForm.value.studentId.trim(), name: stuForm.value.name.trim(), yearLevel: stuForm.value.yearLevel, dept: stuForm.value.dept })
       .then(created => {
-        students.value = [...students.value, { id: created.id, studentId: created.studentId, name: created.name, yearLevel: created.yearLevel, dept: created.dept }]
+        students.value = [...students.value, { id: created.id, studentId: created.studentId, name: created.name, yearLevel: created.yearLevel, dept: created.dept, paidDay: created.paidDay ?? null }]
         toast('Student added.', 'success')
       })
       .catch(e => toast(e.message, 'error'))
@@ -974,6 +1000,187 @@ async function confirmDeleteAttAccount() {
   }
 }
 
+// ── Paid Day localStorage persistence (fallback while Strapi schema deploys) ──
+const PAID_DAY_KEY = 'ccs_paid_day_map'
+
+function loadPaidDayFromStorage(): Record<string, 'First Day' | 'Second Day'> {
+  try { return JSON.parse(localStorage.getItem(PAID_DAY_KEY) ?? '{}') } catch { return {} }
+}
+
+function savePaidDayToStorage(studentId: string, day: 'First Day' | 'Second Day' | null) {
+  const m = loadPaidDayFromStorage()
+  if (day === null) delete m[studentId]
+  else m[studentId] = day
+  localStorage.setItem(PAID_DAY_KEY, JSON.stringify(m))
+}
+
+function getPaidDayFromStorage(studentId: string): 'First Day' | 'Second Day' | null {
+  return loadPaidDayFromStorage()[studentId] ?? null
+}
+interface PaidRow {
+  id: number
+  documentId: string
+  studentId: string
+  name: string
+  yearLevel: string
+  status: 'First Day' | 'Second Day' | null
+}
+
+const paidRows        = ref<PaidRow[]>([])
+const paidPulling     = ref(false)
+const paidPullMsg     = ref('')
+const paidPullError   = ref('')
+const paidProgress    = ref(0)
+const paidSearch      = ref('')
+const paidFilterDay   = ref<'All' | 'First Day' | 'Second Day'>('All')
+const paidFilterYear  = ref('All')
+const paidCurrentPage = ref(1)
+const PAID_PAGE_SIZE  = 15
+const paidYearLevels  = ['All', 'First Year', 'Second Year', 'Third Year', 'Fourth Year']
+
+// Display helper: convert Strapi year level to short form for UI
+function shortYear(y: string): string {
+  const m: Record<string, string> = {
+    'First Year':  '1st Year',
+    'Second Year': '2nd Year',
+    'Third Year':  '3rd Year',
+    'Fourth Year': '4th Year',
+  }
+  return m[y] ?? y
+}
+
+const paidFiltered = computed(() =>
+  paidRows.value.filter(r => {
+    const matchSearch = r.name.toLowerCase().includes(paidSearch.value.toLowerCase())
+    const matchDay    = paidFilterDay.value === 'All' || r.status === paidFilterDay.value
+    const matchYear   = paidFilterYear.value === 'All' ||
+      r.yearLevel.toLowerCase().trim() === paidFilterYear.value.toLowerCase().trim()
+    return matchSearch && matchDay && matchYear
+  })
+)
+
+watch([paidSearch, paidFilterDay, paidFilterYear], () => { paidCurrentPage.value = 1 })
+
+const paidTotalPages = computed(() => Math.max(1, Math.ceil(paidFiltered.value.length / PAID_PAGE_SIZE)))
+const paidPaginated  = computed(() =>
+  paidFiltered.value.slice((paidCurrentPage.value - 1) * PAID_PAGE_SIZE, paidCurrentPage.value * PAID_PAGE_SIZE)
+)
+
+let _paidPageChanging = false
+function paidPrevPage() {
+  if (_paidPageChanging || paidCurrentPage.value <= 1) return
+  _paidPageChanging = true; paidCurrentPage.value--
+  setTimeout(() => { _paidPageChanging = false }, 200)
+}
+function paidNextPage() {
+  if (_paidPageChanging || paidCurrentPage.value >= paidTotalPages.value) return
+  _paidPageChanging = true; paidCurrentPage.value++
+  setTimeout(() => { _paidPageChanging = false }, 200)
+}
+
+const paidUpdating = ref<Set<number>>(new Set())
+
+async function setPaidDay(row: PaidRow, day: 'First Day' | 'Second Day') {
+  if (paidUpdating.value.has(row.id)) return
+  // Toggle: clicking the already-active day unchecks it (sets null)
+  const newDay: 'First Day' | 'Second Day' | null = row.status === day ? null : day
+  paidUpdating.value = new Set([...paidUpdating.value, row.id])
+  try {
+    // 1. Save to delegates (keep status as 'Paid')
+    await updateDelegate(row.documentId, { status: 'Paid' })
+
+    // 2. Always persist to localStorage immediately (works even before Strapi schema is deployed)
+    savePaidDayToStorage(row.studentId, newDay)
+
+    // 3. Try to save paidDay to att-student in Strapi (graceful — fails silently if field not yet deployed)
+    let attStudent = students.value.find(
+      s => s.studentId === row.studentId || s.name.toLowerCase().trim() === row.name.toLowerCase().trim()
+    )
+    try {
+      if (!attStudent) {
+        // Not yet in att-students — create it (paidDay may or may not be accepted by Strapi)
+        const created = await createAttStudent({
+          studentId: row.studentId,
+          name:      row.name,
+          yearLevel: normalizeYearLevel(row.yearLevel),
+          dept:      'CCS',
+          paidDay:   newDay,
+        })
+        const newStu = { id: created.id, studentId: created.studentId, name: created.name, yearLevel: created.yearLevel, dept: created.dept, paidDay: created.paidDay ?? newDay }
+        students.value = [...students.value, newStu]
+        attStudent = newStu
+      } else {
+        // Already exists — update paidDay field in Strapi
+        await updateAttStudent(attStudent.id, { paidDay: newDay })
+        students.value = students.value.map(s =>
+          s.id === attStudent!.id ? { ...s, paidDay: newDay } : s
+        )
+      }
+    } catch {
+      // Strapi paidDay save failed (schema not yet deployed) — localStorage has it covered
+      if (attStudent) {
+        // Still update local state even if Strapi failed
+        students.value = students.value.map(s =>
+          s.id === attStudent!.id ? { ...s, paidDay: newDay } : s
+        )
+      }
+    }
+
+    // 4. Update local row status
+    row.status = newDay
+    if (newDay) toast(`${row.name} marked as ${newDay}.`, 'success')
+    else        toast(`${row.name} day mark removed.`, 'success')
+  } catch (err: any) {
+    toast(`Failed to update ${row.name}: ${err?.message ?? 'unknown error'}`, 'error')
+  } finally {
+    const next = new Set(paidUpdating.value)
+    next.delete(row.id)
+    paidUpdating.value = next
+  }
+}
+
+async function handlePaidPull() {
+  paidPulling.value   = true
+  paidPullMsg.value   = ''
+  paidPullError.value = ''
+  paidProgress.value  = 5
+
+  try {
+    paidPullMsg.value = 'Fetching paid delegates…'
+    const delegates: StrapiDelegate[] = await fetchAllDelegates()
+    const paid = delegates.filter(d => d.status === 'Paid')
+    paidProgress.value = 30
+
+    if (paid.length === 0) {
+      paidPullError.value = 'No paid delegates found in the system.'
+      return
+    }
+
+    const built: PaidRow[] = paid.map(d => {
+      // Cross-reference existing att-students (Strapi) or localStorage for saved paidDay
+      const attStu = students.value.find(
+        s => s.studentId === String(d.id) || s.name.toLowerCase().trim() === d.name.toLowerCase().trim()
+      )
+      const strapiDay = attStu?.paidDay ?? null
+      const localDay  = getPaidDayFromStorage(String(d.id))
+      return {
+        id: d.id, documentId: d.documentId, studentId: String(d.id), name: d.name, yearLevel: d.yearLevel,
+        status: strapiDay ?? localDay,
+      }
+    })
+
+    paidRows.value        = built
+    paidProgress.value    = 100
+    paidPullMsg.value     = `Pulled ${built.length} paid delegate${built.length !== 1 ? 's' : ''}.`
+    paidCurrentPage.value = 1
+  } catch (err: any) {
+    paidPullError.value = err?.message ?? 'Failed to pull paid delegates.'
+  } finally {
+    paidPulling.value = false
+    setTimeout(() => { paidProgress.value = 0; paidPullMsg.value = '' }, 3000)
+  }
+}
+
 watch(raffleEventId, () => { raffleYearFilter.value = '' })
 
 watch(activePage, async (p) => {
@@ -983,6 +1190,7 @@ watch(activePage, async (p) => {
     await nextTick()
     scanInputEl.value?.focus()
   }
+  if (p === 'paid' && paidRows.value.length === 0) { handlePaidPull() }
 })
 
 onMounted(() => {
@@ -1410,9 +1618,14 @@ onMounted(() => {
             </div>
             <div class="flex flex-wrap items-center gap-3">
               <input v-model="stuSearch" type="text" placeholder="Search students..." class="input-search flex-1 min-w-[180px]" />
+              <select v-model="stuDayFilter" class="input-search w-40">
+                <option value="All">All Days</option>
+                <option value="First Day">First Day</option>
+                <option value="Second Day">Second Day</option>
+              </select>
               <select v-model="stuYearFilter" class="input-search w-40">
                 <option value="">All Years</option>
-                <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option>
+                <option value="First Year">1st Year</option><option value="Second Year">2nd Year</option><option value="Third Year">3rd Year</option><option value="Fourth Year">4th Year</option>
               </select>
               <button @click="openImportDialog" class="btn-secondary flex items-center gap-2 text-sm">
                 <span class="w-6 h-6 rounded-full bg-sync-green/10 text-sync-green flex items-center justify-center text-base font-bold">+</span>
@@ -1435,6 +1648,7 @@ onMounted(() => {
                     <th class="px-4 py-3 text-left">Name</th>
                     <th class="px-4 py-3 text-left">Year</th>
                     <th class="px-4 py-3 text-left">Dept</th>
+                    <th class="px-4 py-3 text-left">Status</th>
                     <th class="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1442,8 +1656,19 @@ onMounted(() => {
                   <tr v-for="s in paginatedStudents" :key="s.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td class="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{{ s.studentId }}</td>
                     <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ s.name }}</td>
-                    <td class="px-4 py-3 text-gray-500">{{ s.yearLevel }}</td>
+                    <td class="px-4 py-3 text-gray-500">{{ shortYear(s.yearLevel) }}</td>
                     <td class="px-4 py-3 text-gray-500">{{ s.dept }}</td>
+                    <td class="px-4 py-3">
+                      <span v-if="paidDayMap.get(s.studentId) === 'First Day'"
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        First Day
+                      </span>
+                      <span v-else-if="paidDayMap.get(s.studentId) === 'Second Day'"
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        Second Day
+                      </span>
+                      <span v-else class="text-xs text-gray-300 dark:text-gray-600">—</span>
+                    </td>
                     <td class="px-4 py-3 text-right flex justify-end gap-2">
                       <button @click="openEditStudent(s)" type="button" title="Edit student" class="icon-btn text-blue-600 dark:text-blue-400">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/><path d="M4 20h4l10-10a2.828 2.828 0 00-4-4L4 16v4z"/></svg>
@@ -1742,7 +1967,7 @@ onMounted(() => {
                   <span class="w-7 h-7 rounded-full bg-sync-green text-white flex items-center justify-center text-xs font-bold flex-shrink-0">{{ i+1 }}</span>
                   <div>
                     <p class="text-sm font-semibold text-gray-800 dark:text-white">{{ w.name }}</p>
-                    <p class="text-xs text-gray-500">{{ w.studentId }} · {{ w.yearLevel }}</p>
+                    <p class="text-xs text-gray-500">{{ w.studentId }} · {{ shortYear(w.yearLevel) }}</p>
                   </div>
                 </li>
               </ul>
@@ -1772,6 +1997,199 @@ onMounted(() => {
                   </tr>
                 </tbody>
               </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══ PAID ══ -->
+          <div v-else-if="activePage === 'paid'" class="space-y-5">
+            <div>
+              <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Paid</h1>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Already paid delegates from the CCS Delegates system.</p>
+            </div>
+
+            <!-- Pull button + progress -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-3">
+              <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <button
+                  @click="handlePaidPull"
+                  :disabled="paidPulling"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-sync-green hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors w-fit"
+                >
+                  <svg v-if="paidPulling" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/>
+                  </svg>
+                  {{ paidPulling ? 'Pulling…' : 'Pull' }}
+                </button>
+                <div v-if="paidPulling" class="flex items-center gap-2 flex-1 min-w-[180px] max-w-xs">
+                  <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div class="h-full bg-sync-green rounded-full transition-all duration-300" :style="{ width: paidProgress + '%' }" />
+                  </div>
+                  <span class="text-xs text-gray-500 w-8 text-right">{{ paidProgress }}%</span>
+                </div>
+                <p v-if="paidPullMsg && !paidPulling" class="text-sm text-sync-green font-medium">✓ {{ paidPullMsg }}</p>
+              </div>
+              <div v-if="paidPullError" class="text-sm text-red-600 dark:text-red-400 flex items-center gap-2 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+                {{ paidPullError }}
+              </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+              <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <div class="relative sm:max-w-xs w-full">
+                  <span class="absolute inset-y-0 left-3 flex items-center text-gray-400 pointer-events-none">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/>
+                    </svg>
+                  </span>
+                  <input v-model="paidSearch" type="text" placeholder="Search name…" class="input-search pl-9" />
+                </div>
+                <select v-model="paidFilterYear" class="input-search sm:w-auto sm:min-w-[150px]">
+                  <option v-for="y in paidYearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : shortYear(y) }}</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Table -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div v-if="paidPulling && paidRows.length === 0" class="flex items-center justify-center py-16 text-gray-400">
+                <svg class="animate-spin h-5 w-5 mr-3 text-sync-green" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Loading paid delegates…
+              </div>
+              <div v-else class="overflow-x-auto">
+                <table class="w-full min-w-[780px]">
+                  <thead>
+                    <tr class="border-b border-gray-100 dark:border-gray-800">
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide w-10">#</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Student ID</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Name</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Year Level</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tr
+                      v-for="(r, idx) in paidPaginated"
+                      :key="r.id"
+                      class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+                    >
+                      <td class="px-4 py-3 text-gray-400 text-xs">{{ (paidCurrentPage - 1) * PAID_PAGE_SIZE + idx + 1 }}</td>
+                      <td class="px-4 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">{{ r.studentId }}</td>
+                      <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ r.name }}</td>
+                      <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ shortYear(r.yearLevel) }}</td>
+                      <!-- Status badge -->
+                      <td class="px-4 py-3">
+                        <span v-if="r.status === 'First Day'"
+                          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          First Day
+                        </span>
+                        <span v-else-if="r.status === 'Second Day'"
+                          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          Second Day
+                        </span>
+                        <span v-else class="text-xs text-gray-400 dark:text-gray-600">—</span>
+                      </td>
+                      <!-- Action: checkbox-style toggles -->
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-3">
+                          <!-- First Day checkbox -->
+                          <label
+                            :class="['flex items-center gap-1.5 cursor-pointer select-none group', paidUpdating.has(r.id) ? 'opacity-50 pointer-events-none' : '']"
+                            @click.prevent="setPaidDay(r, 'First Day')"
+                          >
+                            <span :class="[
+                              'w-4 h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0',
+                              r.status === 'First Day'
+                                ? 'bg-blue-500 border-blue-500'
+                                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 group-hover:border-blue-400'
+                            ]">
+                              <svg v-if="paidUpdating.has(r.id)" class="animate-spin w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                              </svg>
+                              <svg v-else-if="r.status === 'First Day'" class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                              </svg>
+                            </span>
+                            <span :class="['text-xs font-medium', r.status === 'First Day' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400']">
+                              1st Day
+                            </span>
+                          </label>
+                          <!-- Second Day checkbox -->
+                          <label
+                            :class="['flex items-center gap-1.5 cursor-pointer select-none group', paidUpdating.has(r.id) ? 'opacity-50 pointer-events-none' : '']"
+                            @click.prevent="setPaidDay(r, 'Second Day')"
+                          >
+                            <span :class="[
+                              'w-4 h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0',
+                              r.status === 'Second Day'
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 group-hover:border-emerald-400'
+                            ]">
+                              <svg v-if="paidUpdating.has(r.id)" class="animate-spin w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                              </svg>
+                              <svg v-else-if="r.status === 'Second Day'" class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                              </svg>
+                            </span>
+                            <span :class="['text-xs font-medium', r.status === 'Second Day' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400']">
+                              2nd Day
+                            </span>
+                          </label>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr v-if="paidPaginated.length === 0">
+                      <td colspan="6" class="px-4 py-12 text-center text-gray-400">
+                        <div class="flex flex-col items-center gap-2">
+                          <svg class="w-8 h-8 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                          </svg>
+                          <p>{{ paidRows.length === 0 ? 'Click "Pull" to load paid delegates.' : 'No results match your filters.' }}</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- Pagination footer -->
+              <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+                <p class="text-xs text-gray-500">
+                  Showing
+                  {{ paidFiltered.length === 0 ? 0 : (paidCurrentPage - 1) * PAID_PAGE_SIZE + 1 }}–{{ Math.min(paidCurrentPage * PAID_PAGE_SIZE, paidFiltered.length) }}
+                  of {{ paidFiltered.length }}
+                </p>
+                <div class="flex items-center gap-2">
+                  <button @click="paidPrevPage" :disabled="paidCurrentPage === 1"
+                    class="btn-secondary inline-flex items-center gap-1 text-xs px-3 py-1.5 disabled:opacity-40">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Prev
+                  </button>
+                  <span class="text-xs text-gray-500 px-1">{{ paidCurrentPage }} / {{ paidTotalPages }}</span>
+                  <button @click="paidNextPage" :disabled="paidCurrentPage === paidTotalPages"
+                    class="btn-secondary inline-flex items-center gap-1 text-xs px-3 py-1.5 disabled:opacity-40">
+                    Next
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1972,7 +2390,7 @@ onMounted(() => {
               <tr v-for="row in dashModalRows" :key="row.studentId + (row.timeIn ?? '')" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                 <td class="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{{ row.studentId }}</td>
                 <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.name }}</td>
-                <td class="px-4 py-3 text-gray-500 text-xs">{{ row.yearLevel }}</td>
+                <td class="px-4 py-3 text-gray-500 text-xs">{{ shortYear(row.yearLevel) }}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ row.dept }}</td>
                 <td v-if="dashModal.type !== 'students'" class="px-4 py-3"><span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold', row.status === 'Logged In' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : row.status === 'Completed' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400']">{{ row.status }}</span></td>
                 <td v-if="dashModal.type !== 'students'" class="px-4 py-3 text-xs text-gray-400">{{ row.date }} {{ row.timeIn }}</td>
@@ -2151,7 +2569,7 @@ onMounted(() => {
             <div class="min-w-0">
               <p class="text-xs font-bold text-sync-green">{{ w.studentId }}</p>
               <p class="text-sm font-semibold text-gray-900 dark:text-white truncate">{{ w.name }}</p>
-              <p class="text-xs text-gray-400">{{ w.yearLevel }}</p>
+              <p class="text-xs text-gray-400">{{ shortYear(w.yearLevel) }}</p>
             </div>
           </div>
         </div>
