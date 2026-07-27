@@ -2066,11 +2066,11 @@ onMounted(() => {
             </div>
 
             <!-- Paid day dashboard stats -->
-            <div v-if="paidRows.length > 0" class="grid grid-cols-3 gap-3 sm:gap-4">
+            <div v-if="paidRows.length > 0" class="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-3 sm:gap-4">
               <!-- 1st Day -->
-              <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-900 p-4 flex flex-col gap-1">
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-900 p-3 sm:p-4 flex flex-col gap-1">
                 <p class="text-xs font-semibold uppercase tracking-wide text-blue-500">1st Day</p>
-                <p class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ paidFirstDayCount }}</p>
+                <p class="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">{{ paidFirstDayCount }}</p>
                 <button
                   @click="paidViewListModal = 'First Day'"
                   class="mt-1 inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors w-fit"
@@ -2080,9 +2080,9 @@ onMounted(() => {
                 </button>
               </div>
               <!-- 2nd Day -->
-              <div class="bg-white dark:bg-gray-900 rounded-xl border border-emerald-200 dark:border-emerald-900 p-4 flex flex-col gap-1">
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-emerald-200 dark:border-emerald-900 p-3 sm:p-4 flex flex-col gap-1">
                 <p class="text-xs font-semibold uppercase tracking-wide text-emerald-500">2nd Day</p>
-                <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ paidSecondDayCount }}</p>
+                <p class="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ paidSecondDayCount }}</p>
                 <button
                   @click="paidViewListModal = 'Second Day'"
                   class="mt-1 inline-flex items-center gap-1.5 text-xs text-emerald-500 hover:text-emerald-700 font-medium transition-colors w-fit"
@@ -2092,9 +2092,9 @@ onMounted(() => {
                 </button>
               </div>
               <!-- No tag -->
-              <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-1">
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 flex flex-col gap-1">
                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">No Tag</p>
-                <p class="text-3xl font-bold text-gray-400">{{ paidNoTagCount }}</p>
+                <p class="text-2xl sm:text-3xl font-bold text-gray-400">{{ paidNoTagCount }}</p>
                 <p class="text-xs text-gray-300 dark:text-gray-600 mt-1">Not yet assigned</p>
               </div>
             </div>
@@ -2259,9 +2259,9 @@ onMounted(() => {
                   class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
                   @click.self="paidViewListModal = null"
                 >
-                  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] sm:max-h-[80vh] flex flex-col mx-auto">
                     <!-- Modal Header -->
-                    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+                    <div class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-800">
                       <div class="flex items-center gap-3">
                         <span
                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
@@ -2292,6 +2292,7 @@ onMounted(() => {
                     </div>
                     <!-- Modal Body -->
                     <div class="overflow-y-auto flex-1">
+                      <div class="overflow-x-auto">
                       <div v-if="paidViewListRows.length === 0" class="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
                         <svg class="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
@@ -2301,10 +2302,10 @@ onMounted(() => {
                       <table v-else class="w-full">
                         <thead class="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
                           <tr>
-                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide w-10">#</th>
-                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Student ID</th>
-                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
-                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Year Level</th>
+                            <th class="px-3 sm:px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide w-8">#</th>
+                            <th class="px-3 sm:px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Student ID</th>
+                            <th class="px-3 sm:px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+                            <th class="px-3 sm:px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Year Level</th>
                           </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -2313,16 +2314,17 @@ onMounted(() => {
                             :key="r.id"
                             class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                           >
-                            <td class="px-5 py-3 text-xs text-gray-400">{{ i + 1 }}</td>
-                            <td class="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">{{ r.studentId }}</td>
-                            <td class="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">{{ r.name }}</td>
-                            <td class="px-5 py-3 text-xs text-gray-500 dark:text-gray-400">{{ shortYear(r.yearLevel) }}</td>
+                            <td class="px-3 sm:px-5 py-2.5 sm:py-3 text-xs text-gray-400">{{ i + 1 }}</td>
+                            <td class="px-3 sm:px-5 py-2.5 sm:py-3 text-xs font-mono text-gray-500 dark:text-gray-400">{{ r.studentId }}</td>
+                            <td class="px-3 sm:px-5 py-2.5 sm:py-3 text-sm font-medium text-gray-900 dark:text-white">{{ r.name }}</td>
+                            <td class="px-3 sm:px-5 py-2.5 sm:py-3 text-xs text-gray-500 dark:text-gray-400">{{ shortYear(r.yearLevel) }}</td>
                           </tr>
                         </tbody>
                       </table>
+                      </div>
                     </div>
                     <!-- Modal Footer -->
-                    <div class="px-6 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+                    <div class="px-4 sm:px-6 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
                       <button
                         @click="paidViewListModal = null"
                         class="btn-secondary text-sm px-4 py-2"
