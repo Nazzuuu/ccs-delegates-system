@@ -6,7 +6,7 @@ import { isSuperAdmin } from '../composables/useAuth'
 import { importDelegates, type ImportRow } from '../api/strapi'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
-const { delegates, loading, error, addDelegate, removeDelegate, yearLevels, loadDelegates } = useDelegates()
+const { delegates, loading, error, addDelegate, removeDelegate, yearLevels, shortYear, loadDelegates } = useDelegates()
 onMounted(() => loadDelegates())
 
 const searchQuery = ref('')
@@ -14,6 +14,7 @@ const PAGE_SIZE   = 10
 const currentPage = ref(1)
 const showModal   = ref(false)
 const newName     = ref('')
+const newStudentId = ref('')
 const newYear     = ref('First Year')
 const addError    = ref('')
 
@@ -36,7 +37,7 @@ function nextPage() {
   currentPage.value++
   setTimeout(() => { _pageChanging = false }, 300)
 }
-function openModal() { newName.value = ''; newYear.value = 'First Year'; addError.value = ''; showModal.value = true }
+function openModal() { newName.value = ''; newStudentId.value = ''; newYear.value = 'First Year'; addError.value = ''; showModal.value = true }
 
 // ── Add confirm ───────────────────────────────────────────────────────────
 const addConfirmOpen    = ref(false)
@@ -50,7 +51,7 @@ function submitAdd() {
 
 async function handleAddConfirm() {
   addConfirmLoading.value = true
-  try { await addDelegate(newName.value.trim(), newYear.value); showModal.value = false; addConfirmOpen.value = false }
+  try { await addDelegate(newName.value.trim(), newYear.value, newStudentId.value.trim()); showModal.value = false; addConfirmOpen.value = false }
   catch (e: any) { addError.value = e.message ?? 'Failed to add.'; addConfirmOpen.value = false }
   finally { addConfirmLoading.value = false }
 }
@@ -250,7 +251,7 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
             <tr v-for="(d, idx) in paginated" :key="d.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
               <td class="table-td text-gray-400 text-xs hidden sm:table-cell">{{ (currentPage-1)*10+idx+1 }}</td>
               <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
-              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ d.yearLevel }}</td>
+              <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
               <td class="table-td">
                 <span :class="{'badge-paid':d.status==='Paid','badge-unpaid':d.status==='Not Paid','badge-backout':d.status==='Backout'}">{{ d.status }}</span>
               </td>
@@ -436,6 +437,10 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
           </h3>
           <div class="space-y-3">
             <div>
+              <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Student ID</label>
+              <input v-model="newStudentId" type="text" placeholder="e.g. 4261124" class="input-search" @keyup.enter="submitAdd"/>
+            </div>
+            <div>
               <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Full Name</label>
               <input v-model="newName" type="text" placeholder="e.g. DELA CRUZ, JUAN" class="input-search" @keyup.enter="submitAdd"/>
               <p v-if="addError" class="text-red-500 text-xs mt-1">{{ addError }}</p>
@@ -443,7 +448,7 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
             <div>
               <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Year Level</label>
               <select v-model="newYear" class="input-search">
-                <option v-for="y in yearLevels.filter(y=>y!=='All')" :key="y" :value="y">{{ y }}</option>
+                <option v-for="y in yearLevels.filter(y=>y!=='All')" :key="y" :value="y">{{ shortYear(y) }}</option>
               </select>
             </div>
           </div>
@@ -462,7 +467,7 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
     <ConfirmDialog
       :open="addConfirmOpen"
       title="Add Student"
-      :message="`Add '${newName}' (${newYear}) to the delegates list?`"
+      :message="`Add '${newName}' (${shortYear(newYear)})${newStudentId ? ' — ID: ' + newStudentId : ''} to the delegates list?`"
       confirm-label="Add Student"
       confirm-class="btn-primary"
       :loading="addConfirmLoading"

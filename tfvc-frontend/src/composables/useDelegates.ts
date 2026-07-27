@@ -42,6 +42,17 @@ export function useDelegates() {
 
   const yearLevels = ['All', 'First Year', 'Second Year', 'Third Year', 'Fourth Year']
 
+  // Display helper: converts Strapi year level to short form for UI
+  function shortYear(y: string): string {
+    const m: Record<string, string> = {
+      'First Year':  '1st Year',
+      'Second Year': '2nd Year',
+      'Third Year':  '3rd Year',
+      'Fourth Year': '4th Year',
+    }
+    return m[y] ?? y
+  }
+
   const filtered = computed(() =>
     delegates.value.filter(d => {
       const matchSearch = d.name.toLowerCase().includes(searchQuery.value.toLowerCase())
@@ -97,7 +108,7 @@ export function useDelegates() {
     await updateDelegate(d.documentId, { isReceived: false })
   }
 
-  async function addDelegate(name: string, yearLevel: string) {
+  async function addDelegate(name: string, yearLevel: string, studentId = '') {
     const trimmedName = name.trim().toUpperCase()
     const exists = delegates.value.find(
       d => d.name.toUpperCase() === trimmedName
@@ -107,6 +118,7 @@ export function useDelegates() {
     }
     const created = await createDelegate({
       name: trimmedName,
+      studentId: studentId.trim(),
       yearLevel,
       status: 'Not Paid',
       isPaid: false,
@@ -133,6 +145,7 @@ export function useDelegates() {
     filterStatus,
     filterYear,
     yearLevels,
+    shortYear,
     loadDelegates,
     markPaid,
     markUnpaid,
