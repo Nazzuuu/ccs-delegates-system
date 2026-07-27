@@ -108,6 +108,7 @@ export async function deleteAllDelegates(): Promise<void> {
 export interface ImportRow {
   name: string
   yearLevel: string
+  studentId?: string
 }
 
 export interface ImportResult {
@@ -150,6 +151,7 @@ export async function importDelegates(
           await createDelegate({
             name: r.name.trim().toUpperCase(),
             yearLevel: r.yearLevel,
+            studentId: r.studentId?.trim() ?? '',
             status: 'Not Paid',
             isPaid: false,
             isReceived: false,
