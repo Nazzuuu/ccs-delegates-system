@@ -461,22 +461,24 @@ const excelInputEl  = ref<HTMLInputElement|null>(null)
 const currentStudentPage = ref(1)
 const studentsPerPage = ref(8)
 
-// Map from studentId → day status.
-// Priority: paidRows (in-memory this session) > students[].paidDay (Strapi, persistent) > localStorage (offline fallback)
+// Map from UPPERCASE NAME → day status.
+// Name is the only field shared between delegates and att-students.
+// Priority: paidRows (in-session) > students[].paidDay (Strapi) > localStorage (offline fallback)
 const paidDayMap = computed(() => {
   const m = new Map<string, 'First Day' | 'Second Day'>()
-  // 1. localStorage fallback (always available, even before Strapi schema is deployed)
+  // 1. localStorage fallback
   const stored = loadPaidDayFromStorage()
-  for (const [sid, day] of Object.entries(stored)) {
-    m.set(sid, day as 'First Day' | 'Second Day')
+  for (const [nameKey, day] of Object.entries(stored)) {
+    m.set(nameKey, day as 'First Day' | 'Second Day')
   }
-  // 2. students[] from Strapi (overrides localStorage if paidDay field is live)
+  // 2. students[] paidDay from Strapi (overrides localStorage)
   for (const s of students.value) {
-    if (s.paidDay) m.set(s.studentId, s.paidDay)
+    if (s.paidDay) m.set(paidDayKeyOf(s.name), s.paidDay)
   }
-  // 3. paidRows (most recent in-session state overrides all)
+  // 3. paidRows in-session state (most recent, overrides all)
   for (const r of paidRows.value) {
-    if (r.status) m.set(r.studentId, r.status)
+    if (r.status) m.set(paidDayKeyOf(r.name), r.status)
+    else m.delete(paidDayKeyOf(r.name))  // also clear if explicitly unchecked
   }
   return m
 })
@@ -1003,19 +1005,23 @@ async function confirmDeleteAttAccount() {
 // ── Paid Day localStorage persistence (fallback while Strapi schema deploys) ──
 const PAID_DAY_KEY = 'ccs_paid_day_map'
 
+// Key is normalized uppercase name (the only field shared between delegates & att-students)
+function paidDayKeyOf(name: string) { return name.toUpperCase().trim() }
+
 function loadPaidDayFromStorage(): Record<string, 'First Day' | 'Second Day'> {
   try { return JSON.parse(localStorage.getItem(PAID_DAY_KEY) ?? '{}') } catch { return {} }
 }
 
-function savePaidDayToStorage(studentId: string, day: 'First Day' | 'Second Day' | null) {
+function savePaidDayToStorage(name: string, day: 'First Day' | 'Second Day' | null) {
   const m = loadPaidDayFromStorage()
-  if (day === null) delete m[studentId]
-  else m[studentId] = day
+  const key = paidDayKeyOf(name)
+  if (day === null) delete m[key]
+  else m[key] = day
   localStorage.setItem(PAID_DAY_KEY, JSON.stringify(m))
 }
 
-function getPaidDayFromStorage(studentId: string): 'First Day' | 'Second Day' | null {
-  return loadPaidDayFromStorage()[studentId] ?? null
+function getPaidDayFromStorage(name: string): 'First Day' | 'Second Day' | null {
+  return loadPaidDayFromStorage()[paidDayKeyOf(name)] ?? null
 }
 interface PaidRow {
   id: number

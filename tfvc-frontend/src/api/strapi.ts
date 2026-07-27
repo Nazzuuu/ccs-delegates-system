@@ -13,6 +13,7 @@ export interface StrapiDelegate {
   id: number
   documentId: string   // Strapi v5 — used for PUT/DELETE
   name: string
+  studentId: string    // real student ID from the school system (e.g. 4251422)
   yearLevel: string
   status: 'Paid' | 'Not Paid' | 'Backout'
   isPaid: boolean
@@ -24,6 +25,7 @@ function mapEntry(d: any): StrapiDelegate {
     id: d.id,
     documentId: d.documentId,
     name: d.name,
+    studentId: d.studentId ?? '',
     yearLevel: d.yearLevel,
     status: d.status,
     isPaid: d.isPaid,
@@ -55,7 +57,7 @@ export async function fetchAllDelegates(): Promise<StrapiDelegate[]> {
 /** Update a delegate using its documentId (Strapi v5). */
 export async function updateDelegate(
   documentId: string,
-  data: Partial<Pick<StrapiDelegate, 'status' | 'isPaid' | 'isReceived' | 'name' | 'yearLevel'>>
+  data: Partial<Pick<StrapiDelegate, 'status' | 'isPaid' | 'isReceived' | 'name' | 'yearLevel' | 'studentId'>>
 ): Promise<void> {
   const res = await fetch(`${BASE}/delegates/${documentId}`, {
     method: 'PUT',
