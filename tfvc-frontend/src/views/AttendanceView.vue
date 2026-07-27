@@ -263,7 +263,7 @@ function startAutoRefresh() {
     if (loadAllInProgress) return  // skip this tick if previous fetch is still running
     await loadAll(true)
     lastSynced.value = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  }, 5000)
+  }, 1000)
 }
 
 function stopAutoRefresh() {
