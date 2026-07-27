@@ -135,6 +135,18 @@ export function useDelegates() {
     if (idx !== -1) delegates.value.splice(idx, 1)
   }
 
+  async function editDelegate(id: number, studentId: string, name: string, yearLevel: string) {
+    const d = delegates.value.find(x => x.id === id)
+    if (!d) return
+    // Check for duplicate name (excluding self)
+    const duplicate = delegates.value.find(x => x.id !== id && x.name.toUpperCase() === name.toUpperCase())
+    if (duplicate) throw new Error(`"${name}" already exists in the list (${duplicate.yearLevel}).`)
+    await updateDelegate(d.documentId, { studentId, name, yearLevel })
+    d.studentId = studentId
+    d.name      = name
+    d.yearLevel = yearLevel
+  }
+
   return {
     delegates,
     loading,
@@ -154,5 +166,6 @@ export function useDelegates() {
     markNotReceived,
     addDelegate,
     removeDelegate,
+    editDelegate,
   }
 }
