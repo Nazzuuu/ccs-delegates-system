@@ -238,13 +238,13 @@ async function loadAll(silent = false) {
   }
 }
 
-// ── Auto-refresh: silently poll Strapi every 5 seconds ──
+// ── Auto-refresh: silently poll Strapi every 3 seconds ──
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 function startAutoRefresh() {
   if (autoRefreshTimer) return
   isLive.value = true
-  autoRefreshTimer = setInterval(() => loadAll(true), 5000)
+  autoRefreshTimer = setInterval(() => loadAll(true), 3000)
 }
 
 function stopAutoRefresh() {
@@ -252,13 +252,9 @@ function stopAutoRefresh() {
   isLive.value = false
 }
 
+// Live button = manual refresh trigger only; auto-refresh always stays running while logged in
 function toggleLive() {
-  if (isLive.value) {
-    stopAutoRefresh()
-    loadAll(true)
-  } else {
-    startAutoRefresh()
-  }
+  loadAll(true)
 }
 
 const isLive = ref(false)
@@ -1231,7 +1227,8 @@ onMounted(() => {
             <svg :class="['w-3.5 h-3.5', isLive ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            {{ isLive ? 'Live' : 'Refresh' }}
+            <span v-if="isLive" title="Auto-syncing every 3 seconds. Click to refresh now.">Live</span>
+            <span v-else title="Auto-sync is off. Click to refresh.">Offline</span>
           </button>
           <button @click="toggleDark()" class="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <svg v-if="!isDark" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
