@@ -1448,7 +1448,7 @@ onMounted(() => {
                       <button @click="openEditStudent(s)" type="button" title="Edit student" class="icon-btn text-blue-600 dark:text-blue-400">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/><path d="M4 20h4l10-10a2.828 2.828 0 00-4-4L4 16v4z"/></svg>
                     </button>
-                      <button v-if="isSuperAdmin" @click="deleteStudent(s.id)" type="button" title="Delete student" class="icon-btn text-red-500">
+                      <button @click="deleteStudent(s.id)" type="button" title="Delete student" class="icon-btn text-red-500">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                       </button>
                     </td>
