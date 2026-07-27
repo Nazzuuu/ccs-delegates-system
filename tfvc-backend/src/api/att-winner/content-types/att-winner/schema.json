@@ -1,0 +1,20 @@
+{
+  "kind": "collectionType",
+  "collectionName": "att_winners",
+  "info": {
+    "singularName": "att-winner",
+    "pluralName": "att-winners",
+    "displayName": "Att Winner",
+    "description": "Raffle winners"
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "studentId":  { "type": "string", "required": true },
+    "name":       { "type": "string" },
+    "yearLevel":  { "type": "string" },
+    "eventId":    { "type": "string" },
+    "eventName":  { "type": "string" },
+    "drawDate":   { "type": "string" }
+  }
+}

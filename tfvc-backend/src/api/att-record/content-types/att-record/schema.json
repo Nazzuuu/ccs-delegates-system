@@ -1,0 +1,22 @@
+{
+  "kind": "collectionType",
+  "collectionName": "att_records",
+  "info": {
+    "singularName": "att-record",
+    "pluralName": "att-records",
+    "displayName": "Att Record",
+    "description": "Attendance login records"
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "eventId":    { "type": "string", "required": true },
+    "eventName":  { "type": "string" },
+    "studentId":  { "type": "string", "required": true },
+    "name":       { "type": "string" },
+    "yearLevel":  { "type": "string" },
+    "dept":       { "type": "string" },
+    "date":       { "type": "string" },
+    "timeIn":     { "type": "string" }
+  }
+}

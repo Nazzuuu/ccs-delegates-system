@@ -1,0 +1,18 @@
+{
+  "kind": "collectionType",
+  "collectionName": "att_students",
+  "info": {
+    "singularName": "att-student",
+    "pluralName": "att-students",
+    "displayName": "Att Student",
+    "description": "Attendance system students"
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "studentId":  { "type": "string", "required": true },
+    "name":       { "type": "string", "required": true },
+    "yearLevel":  { "type": "string", "required": true },
+    "dept":       { "type": "string" }
+  }
+}

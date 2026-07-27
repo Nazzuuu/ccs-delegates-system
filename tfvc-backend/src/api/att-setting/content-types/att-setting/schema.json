@@ -1,0 +1,20 @@
+{
+  "kind": "singleType",
+  "collectionName": "att_settings",
+  "info": {
+    "singularName": "att-setting",
+    "pluralName": "att-settings",
+    "displayName": "Att Setting",
+    "description": "Attendance system global settings"
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "acadYear":           { "type": "string",  "default": "2025-2026" },
+    "dept":              { "type": "string",  "default": "CCS" },
+    "allowDuplicate":    { "type": "boolean", "default": false },
+    "raffleAttendeeOnly":{ "type": "boolean", "default": true },
+    "activeEventId":     { "type": "string",  "default": "" },
+    "loginMode":         { "type": "string",  "default": "login" }
+  }
+}

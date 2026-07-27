@@ -1,8 +1,17 @@
 ﻿<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { login, logout, currentUser, isSuperAdmin } from '../composables/useAuth'
-import { fetchAppUserByEmail, createAppUser, fetchAppUsers, deleteAppUser, type AppUser } from '../api/strapi'
+import {
+  fetchAppUserByEmail, createAppUser, fetchAppUsers, deleteAppUser, type AppUser,
+  fetchAttEvents,   createAttEvent,   updateAttEvent,   deleteAttEvent,   type AttEvent   as SAttEvent,
+  fetchAttStudents, createAttStudent, updateAttStudent, deleteAttStudent, bulkCreateAttStudents, type AttStudent,
+  fetchAttRecords,  createAttRecord,  deleteAttRecord,  deleteAllAttRecords,  type AttRecord  as SAttRecord,
+  fetchAttLogouts,  createAttLogout,  deleteAllAttLogouts, type AttLogout,
+  fetchAttWinners,  createAttWinner,  deleteAttWinner,  deleteAllAttWinners,  type AttWinner,
+  fetchAttSetting,  saveAttSetting,   type AttSetting,
+} from '../api/strapi'
 
+// Local interface aliases (kept for backward compat with template)
 interface AttEvent  { id: string; name: string; type: string; date: string; venue: string; status: string }
 interface Student   { id: string; studentId: string; name: string; yearLevel: string; dept: string }
 interface AttRecord { id: string; eventId: string; eventName: string; studentId: string; name: string; yearLevel: string; dept: string; date: string; timeIn: string }
@@ -134,10 +143,6 @@ const navItems: Array<{ key: PageKey; label: string; icon: string }> = [
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/>` },
 ]
 
-function lsGet<T>(key: string, fallback: T): T {
-  try { return JSON.parse(localStorage.getItem('ccs_' + key) || 'null') ?? fallback } catch { return fallback }
-}
-function lsSet(key: string, val: any) { localStorage.setItem('ccs_' + key, JSON.stringify(val)) }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }
 function nowDate(): string { const date = new Date().toISOString().split('T')[0]; return date ?? '' }
 function nowTime() { return new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
@@ -200,26 +205,42 @@ function handleScanInput() {
   // If less than MIN_SCAN_LENGTH chars → do nothing, user must press Enter
 }
 
-function loadAll(silent = false) {
-  events.value     = lsGet('events', [])
-  students.value   = lsGet('students', [])
-  attendance.value = lsGet('attendance', [])
-  logouts.value    = lsGet('logouts', [])
-  winners.value    = lsGet('winners', [])
-  const s = lsGet<AppSettings>('settings', settings.value)
-  settings.value   = { ...settings.value, ...s }
-  attEventId.value    = settings.value.activeEventId || ''
-  raffleEventId.value = settings.value.activeEventId || ''
-  if (!silent) focusScanInput()
+const isLoading = ref(false)
+
+async function loadAll(silent = false) {
+  if (!silent) isLoading.value = true
+  try {
+    const [evts, stus, recs, logs, wins, cfg] = await Promise.all([
+      fetchAttEvents(),
+      fetchAttStudents(),
+      fetchAttRecords(),
+      fetchAttLogouts(),
+      fetchAttWinners(),
+      fetchAttSetting(),
+    ])
+    events.value     = evts.map(e => ({ id: e.id, name: e.name, type: e.type, date: e.date, venue: e.venue, status: e.status }))
+    students.value   = stus.map(s => ({ id: s.id, studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }))
+    attendance.value = recs.map(r => ({ id: r.id, eventId: r.eventId, eventName: r.eventName, studentId: r.studentId, name: r.name, yearLevel: r.yearLevel, dept: r.dept, date: r.date, timeIn: r.timeIn }))
+    logouts.value    = logs.map(l => ({ id: l.id, eventId: l.eventId, eventName: l.eventName, studentId: l.studentId, name: l.name, yearLevel: l.yearLevel, dept: l.dept, date: l.date, timeOut: l.timeOut }))
+    winners.value    = wins.map(w => ({ id: w.id, studentId: w.studentId, name: w.name, yearLevel: w.yearLevel, eventId: w.eventId, eventName: w.eventName, drawDate: w.drawDate }))
+    settings.value   = { ...settings.value, ...cfg }
+    attEventId.value    = cfg.activeEventId || ''
+    raffleEventId.value = cfg.activeEventId || ''
+  } catch (e: any) {
+    if (!silent) toast('Failed to load data from server: ' + (e.message ?? ''), 'error')
+  } finally {
+    if (!silent) isLoading.value = false
+    if (!silent) focusScanInput()
+  }
 }
 
-// ── Auto-refresh: silently re-read localStorage every 3 seconds ──
+// ── Auto-refresh: silently poll Strapi every 5 seconds ──
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 function startAutoRefresh() {
   if (autoRefreshTimer) return
   isLive.value = true
-  autoRefreshTimer = setInterval(() => loadAll(true), 3000)
+  autoRefreshTimer = setInterval(() => loadAll(true), 5000)
 }
 
 function stopAutoRefresh() {
@@ -382,28 +403,29 @@ function openAddEvent() { editEvtId.value = null; evtForm.value = { name: '', ty
 function openEditEvent(e: AttEvent) { editEvtId.value = e.id; evtForm.value = { name: e.name, type: e.type, date: e.date, venue: e.venue, desc: '' }; showEvtModal.value = true }
 function saveEvent() {
   if (!evtForm.value.name.trim() || !evtForm.value.date) { toast('Event name and date are required.', 'error'); return }
-  const list = [...events.value]
   if (editEvtId.value) {
-    const i = list.findIndex(e => e.id === editEvtId.value)
-    if (i !== -1) {
-      const current = list[i]
-      if (current) {
-        list[i] = { ...current, name: evtForm.value.name, type: evtForm.value.type, date: evtForm.value.date, venue: evtForm.value.venue }
-      }
-    }
-    toast('Event updated successfully.', 'success')
+    updateAttEvent(editEvtId.value, { name: evtForm.value.name, type: evtForm.value.type, date: evtForm.value.date, venue: evtForm.value.venue })
+      .then(() => { loadAll(true); toast('Event updated successfully.', 'success') })
+      .catch(e => toast(e.message, 'error'))
   } else {
-    list.push({ id: uid(), name: evtForm.value.name, type: evtForm.value.type, date: evtForm.value.date, venue: evtForm.value.venue, status: 'Active' })
-    toast('Event added successfully.', 'success')
+    createAttEvent({ name: evtForm.value.name, type: evtForm.value.type, date: evtForm.value.date, venue: evtForm.value.venue, status: 'Active' })
+      .then(created => {
+        events.value = [...events.value, { id: created.id, name: created.name, type: created.type, date: created.date, venue: created.venue, status: created.status }]
+        toast('Event added successfully.', 'success')
+      })
+      .catch(e => toast(e.message, 'error'))
   }
-  events.value = list; lsSet('events', list); showEvtModal.value = false
+  showEvtModal.value = false
 }
 async function deleteEvent(id: string) {
   const ev = events.value.find(e => e.id === id)
   const ok = await showConfirm('Delete Event', `Are you sure you want to delete "${ev?.name}"? This cannot be undone.`)
   if (!ok) return
-  events.value = events.value.filter(e => e.id !== id); lsSet('events', events.value)
-  toast('Event deleted.', 'info')
+  try {
+    await deleteAttEvent(id)
+    events.value = events.value.filter(e => e.id !== id)
+    toast('Event deleted.', 'info')
+  } catch (e: any) { toast(e.message, 'error') }
 }
 
 const stuSearch     = ref('')
@@ -507,8 +529,13 @@ function processImportFile(file: File) {
           added++
         })
 
-        attendance.value = records
-        lsSet('attendance', records)
+        // Push new records to Strapi in bulk
+        const newRecs = records.filter(r => !attendance.value.find(a => a.id === r.id))
+        Promise.all(newRecs.map(r => createAttRecord({ eventId: r.eventId, eventName: r.eventName, studentId: r.studentId, name: r.name, yearLevel: r.yearLevel, dept: r.dept, date: r.date, timeIn: r.timeIn })))
+          .then(created => {
+            attendance.value = [...attendance.value, ...created.map(c => ({ id: c.id, eventId: c.eventId, eventName: c.eventName, studentId: c.studentId, name: c.name, yearLevel: c.yearLevel, dept: c.dept, date: c.date, timeIn: c.timeIn }))]
+          })
+          .catch(e => toast('Some records failed to save: ' + e.message, 'error'))
         toast(`Imported ${added} attendance records. ${skipped} skipped.`, added ? 'success' : 'warning')
       } else if (isStudentImport) {
         const list = [...students.value]
@@ -528,8 +555,12 @@ function processImportFile(file: File) {
           if (list.find(s => s.name.toLowerCase() === name.toLowerCase())) { skipped++; return }
           list.push({ id: uid(), studentId, name, yearLevel, dept }); added++
         })
-        students.value = list; lsSet('students', list)
-        toast(`Imported ${added} students. ${skipped} skipped.`, 'success')
+        bulkCreateAttStudents(list.filter(s => !students.value.find(x => x.id === s.id)).map(s => ({ studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept })))
+          .then(res => {
+            loadAll(true)
+            toast(`Imported ${res.added} students. ${skipped} skipped.${res.failed.length ? ' Some failed: ' + res.failed.join(', ') : ''}`, 'success')
+          })
+          .catch(e => toast(e.message, 'error'))
       } else {
         toast('File must include Student ID, Name, Year Level and Department for student import, or attendance columns for attendance import.', 'error')
       }
@@ -543,30 +574,35 @@ function processImportFile(file: File) {
 }
 function saveStudent() {
   if (!stuForm.value.studentId.trim() || !stuForm.value.name.trim()) { toast('Student ID and Name are required.', 'error'); return }
-  const list = [...students.value]
   if (editStuId.value) {
-    const i = list.findIndex(s => s.id === editStuId.value)
-    if (i !== -1) {
-      const current = list[i]
-      if (current) {
-        list[i] = { ...current, ...stuForm.value }
-      }
-    }
-    toast('Student updated.', 'success')
+    updateAttStudent(editStuId.value, { studentId: stuForm.value.studentId, name: stuForm.value.name, yearLevel: stuForm.value.yearLevel, dept: stuForm.value.dept })
+      .then(() => {
+        const i = students.value.findIndex(s => s.id === editStuId.value)
+        if (i !== -1) students.value[i] = { id: editStuId.value!, ...stuForm.value }
+        toast('Student updated.', 'success')
+      })
+      .catch(e => toast(e.message, 'error'))
   } else {
-    if (list.find(s => s.studentId === stuForm.value.studentId)) { toast('Student ID already exists.', 'error'); return }
-    if (list.find(s => s.name.toLowerCase() === stuForm.value.name.trim().toLowerCase())) { toast(`"${stuForm.value.name.trim()}" already exists in the list.`, 'error'); return }
-    list.push({ id: uid(), ...stuForm.value })
-    toast('Student added.', 'success')
+    if (students.value.find(s => s.studentId === stuForm.value.studentId)) { toast('Student ID already exists.', 'error'); return }
+    if (students.value.find(s => s.name.toLowerCase() === stuForm.value.name.trim().toLowerCase())) { toast(`"${stuForm.value.name.trim()}" already exists.`, 'error'); return }
+    createAttStudent({ studentId: stuForm.value.studentId.trim(), name: stuForm.value.name.trim(), yearLevel: stuForm.value.yearLevel, dept: stuForm.value.dept })
+      .then(created => {
+        students.value = [...students.value, { id: created.id, studentId: created.studentId, name: created.name, yearLevel: created.yearLevel, dept: created.dept }]
+        toast('Student added.', 'success')
+      })
+      .catch(e => toast(e.message, 'error'))
   }
-  students.value = list; lsSet('students', list); showStuModal.value = false
+  showStuModal.value = false
 }
 async function deleteStudent(id: string) {
   const s = students.value.find(x => x.id === id)
   const ok = await showConfirm('Delete Student', `Remove "${s?.name}" (${s?.studentId}) from the list?`)
   if (!ok) return
-  students.value = students.value.filter(s => s.id !== id); lsSet('students', students.value)
-  toast('Student removed.', 'info')
+  try {
+    await deleteAttStudent(id)
+    students.value = students.value.filter(s => s.id !== id)
+    toast('Student removed.', 'info')
+  } catch (e: any) { toast(e.message, 'error') }
 }
 function triggerExcel() { excelInputEl.value?.click() }
 function handleExcel(e: Event) {
@@ -656,7 +692,9 @@ function logAttendance() {
     }
     const newLogouts = [...logouts.value, logoutRec]
     logouts.value = newLogouts
-    lsSet('logouts', newLogouts)
+    createAttLogout({ eventId: logoutRec.eventId, eventName: logoutRec.eventName, studentId: logoutRec.studentId, name: logoutRec.name, yearLevel: logoutRec.yearLevel, dept: logoutRec.dept, date: logoutRec.date, timeOut: logoutRec.timeOut })
+      .then(saved => { logouts.value = [...logouts.value.filter(l => l !== logoutRec), { ...logoutRec, id: saved.id }] })
+      .catch(e => toast('Failed to save logout: ' + e.message, 'error'))
     setScanStatus(`${currentStudent.name} logged out at ${logoutRec.timeOut}`, 'success')
     scanInput.value = ''
     scanInputEl.value?.focus()
@@ -671,8 +709,10 @@ function logAttendance() {
   const ev = events.value.find(e => e.id === attEventId.value)
   const eventName = ev?.name ?? '—'
   const rec: AttRecord = { id: uid(), eventId: attEventId.value, eventName, studentId: currentStudent.studentId, name: currentStudent.name, yearLevel: currentStudent.yearLevel, dept: currentStudent.dept, date: nowDate(), timeIn: nowTime() }
-  const list = [...attendance.value, rec]
-  attendance.value = list; lsSet('attendance', list)
+  attendance.value = [...attendance.value, rec]
+  createAttRecord({ eventId: rec.eventId, eventName: rec.eventName, studentId: rec.studentId, name: rec.name, yearLevel: rec.yearLevel, dept: rec.dept, date: rec.date, timeIn: rec.timeIn })
+    .then(saved => { attendance.value = [...attendance.value.filter(a => a !== rec), { ...rec, id: saved.id }] })
+    .catch(e => toast('Failed to save attendance: ' + e.message, 'error'))
   setScanStatus(`${currentStudent.name} (${currentStudent.yearLevel}) logged in at ${rec.timeIn}`, 'success')
   scanInput.value = ''
   scanInputEl.value?.focus()
@@ -759,8 +799,10 @@ function startDrawAnimation(pool: RaffleEntry[], count: number) {
     const ev = events.value.find(e => e.id === raffleEventId.value)
     const drawDate = new Date().toLocaleString('en-PH')
     const newW = drawn.map(d => ({ id: uid(), studentId: d.studentId, name: d.name, yearLevel: d.yearLevel, eventId: raffleEventId.value, eventName: ev?.name ?? '—', drawDate }))
-    const list = [...winners.value, ...newW]
-    winners.value = list; lsSet('winners', list)
+    winners.value = [...winners.value, ...newW]
+    Promise.all(newW.map(w => createAttWinner({ studentId: w.studentId, name: w.name, yearLevel: w.yearLevel, eventId: w.eventId, eventName: w.eventName, drawDate: w.drawDate })))
+      .then(saved => { winners.value = [...winners.value.filter(w => !newW.includes(w)), ...saved.map((s, i) => ({ ...newW[i]!, id: s.id }))] })
+      .catch(e => toast('Failed to save winners: ' + e.message, 'error'))
     latestWinners.value = newW
     showLatest.value = true
     showWinnersModal.value = true
@@ -781,9 +823,12 @@ function doDraw() {
 async function clearWinners() {
   const ok = await showConfirm('Clear Winners', raffleEventId.value ? 'Clear all winners for this event?' : 'Clear ALL raffle winners from every event?')
   if (!ok) return
-  const list = raffleEventId.value ? winners.value.filter(w => w.eventId !== raffleEventId.value) : []
-  winners.value = list; lsSet('winners', list); showLatest.value = false
-  toast('Winners cleared.', 'info')
+  try {
+    await deleteAllAttWinners(raffleEventId.value || undefined)
+    winners.value = raffleEventId.value ? winners.value.filter(w => w.eventId !== raffleEventId.value) : []
+    showLatest.value = false
+    toast('Winners cleared.', 'info')
+  } catch (e: any) { toast('Failed to clear winners: ' + e.message, 'error') }
 }
 
 const setForm = ref({ acadYear: '', dept: '', allowDuplicate: false, raffleAttendeeOnly: true, activeEventId: '', loginMode: 'login' as 'login' | 'logout' })
@@ -793,23 +838,36 @@ function loadSettingsForm() {
 }
 function saveSettings() {
   const s: AppSettings = { acadYear: setForm.value.acadYear, dept: setForm.value.dept, allowDuplicate: setForm.value.allowDuplicate, raffleAttendeeOnly: setForm.value.raffleAttendeeOnly, activeEventId: setForm.value.activeEventId, loginMode: setForm.value.loginMode }
-  settings.value = s; lsSet('settings', s); attEventId.value = s.activeEventId || ''; raffleEventId.value = s.activeEventId || ''; toast('Settings saved!', 'success')
+  settings.value = s
+  attEventId.value = s.activeEventId || ''
+  raffleEventId.value = s.activeEventId || ''
+  saveAttSetting(s)
+    .then(() => toast('Settings saved!', 'success'))
+    .catch(e => toast('Failed to save settings: ' + e.message, 'error'))
 }
 async function clearAllData() {
   const ok = await showConfirm('Clear All Data', 'This will permanently delete ALL events, students, attendance records, and raffle data. This action cannot be undone.')
   if (!ok) return
-  ;['events','students','attendance','logouts','winners'].forEach(k => localStorage.removeItem('ccs_' + k))
-  loadAll(); toast('All data cleared.', 'info')
+  try {
+    await Promise.all([
+      deleteAllAttRecords(),
+      deleteAllAttLogouts(),
+      deleteAllAttWinners(),
+    ])
+    await loadAll(true)
+    toast('All data cleared.', 'info')
+  } catch (e: any) { toast('Failed to clear data: ' + e.message, 'error') }
 }
 
 async function clearAttendanceOnly() {
   const ok = await showConfirm('Clear Attendance Records', 'This will delete ALL attendance and logout records. Students and events will not be affected.')
   if (!ok) return
-  attendance.value = []
-  logouts.value    = []
-  lsSet('attendance', [])
-  lsSet('logouts', [])
-  toast('Attendance records cleared.', 'info')
+  try {
+    await Promise.all([deleteAllAttRecords(), deleteAllAttLogouts()])
+    attendance.value = []
+    logouts.value    = []
+    toast('Attendance records cleared.', 'info')
+  } catch (e: any) { toast('Failed to clear attendance: ' + e.message, 'error') }
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• TOASTS 

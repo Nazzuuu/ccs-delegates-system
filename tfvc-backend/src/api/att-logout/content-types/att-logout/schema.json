@@ -1,0 +1,22 @@
+{
+  "kind": "collectionType",
+  "collectionName": "att_logouts",
+  "info": {
+    "singularName": "att-logout",
+    "pluralName": "att-logouts",
+    "displayName": "Att Logout",
+    "description": "Attendance logout records"
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "eventId":    { "type": "string", "required": true },
+    "eventName":  { "type": "string" },
+    "studentId":  { "type": "string", "required": true },
+    "name":       { "type": "string" },
+    "yearLevel":  { "type": "string" },
+    "dept":       { "type": "string" },
+    "date":       { "type": "string" },
+    "timeOut":    { "type": "string" }
+  }
+}

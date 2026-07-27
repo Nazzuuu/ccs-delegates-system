@@ -234,3 +234,343 @@ export async function deleteAppUser(documentId: string): Promise<void> {
     throw new Error(`Delete account failed: ${res.status} ${txt}`)
   }
 }
+
+
+// ── Attendance System API ────────────────────────────────────────────────────
+
+// ── att-event ────────────────────────────────────────────────────────────────
+export interface AttEvent {
+  id: string          // documentId from Strapi
+  name: string
+  type: string
+  date: string
+  venue: string
+  status: string
+}
+
+function mapAttEvent(d: any): AttEvent {
+  return {
+    id: d.documentId,
+    name: d.name ?? '',
+    type: d.type ?? '',
+    date: d.date ?? '',
+    venue: d.venue ?? '',
+    status: d.status ?? 'upcoming',
+  }
+}
+
+export async function fetchAttEvents(): Promise<AttEvent[]> {
+  const res = await fetch(`${BASE}/att-events?pagination[pageSize]=200&sort=date:DESC`, { headers })
+  if (!res.ok) throw new Error(`fetchAttEvents failed: ${res.status}`)
+  const json = await res.json()
+  return json.data.map(mapAttEvent)
+}
+
+export async function createAttEvent(data: Omit<AttEvent, 'id'>): Promise<AttEvent> {
+  const res = await fetch(`${BASE}/att-events`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`createAttEvent failed: ${res.status}`)
+  return mapAttEvent((await res.json()).data)
+}
+
+export async function updateAttEvent(id: string, data: Partial<Omit<AttEvent, 'id'>>): Promise<void> {
+  const res = await fetch(`${BASE}/att-events/${id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`updateAttEvent failed: ${res.status}`)
+}
+
+export async function deleteAttEvent(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/att-events/${id}`, { method: 'DELETE', headers })
+  if (!res.ok) throw new Error(`deleteAttEvent failed: ${res.status}`)
+}
+
+// ── att-student ───────────────────────────────────────────────────────────────
+export interface AttStudent {
+  id: string          // documentId
+  studentId: string
+  name: string
+  yearLevel: string
+  dept: string
+}
+
+function mapAttStudent(d: any): AttStudent {
+  return {
+    id: d.documentId,
+    studentId: d.studentId ?? '',
+    name: d.name ?? '',
+    yearLevel: d.yearLevel ?? '',
+    dept: d.dept ?? '',
+  }
+}
+
+export async function fetchAttStudents(): Promise<AttStudent[]> {
+  const PAGE = 200
+  let page = 1
+  const all: AttStudent[] = []
+  while (true) {
+    const res = await fetch(`${BASE}/att-students?pagination[page]=${page}&pagination[pageSize]=${PAGE}&sort=name:ASC`, { headers })
+    if (!res.ok) throw new Error(`fetchAttStudents failed: ${res.status}`)
+    const json = await res.json()
+    all.push(...json.data.map(mapAttStudent))
+    if (all.length >= json.meta.pagination.total) break
+    page++
+  }
+  return all
+}
+
+export async function createAttStudent(data: Omit<AttStudent, 'id'>): Promise<AttStudent> {
+  const res = await fetch(`${BASE}/att-students`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`createAttStudent failed: ${res.status}`)
+  return mapAttStudent((await res.json()).data)
+}
+
+export async function updateAttStudent(id: string, data: Partial<Omit<AttStudent, 'id'>>): Promise<void> {
+  const res = await fetch(`${BASE}/att-students/${id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`updateAttStudent failed: ${res.status}`)
+}
+
+export async function deleteAttStudent(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/att-students/${id}`, { method: 'DELETE', headers })
+  if (!res.ok) throw new Error(`deleteAttStudent failed: ${res.status}`)
+}
+
+export async function bulkCreateAttStudents(rows: Omit<AttStudent, 'id'>[]): Promise<{ added: number; failed: string[] }> {
+  const result = { added: 0, failed: [] as string[] }
+  const BATCH = 10
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH)
+    await Promise.all(batch.map(async r => {
+      try { await createAttStudent(r); result.added++ }
+      catch { result.failed.push(r.name) }
+    }))
+  }
+  return result
+}
+
+// ── att-record ────────────────────────────────────────────────────────────────
+export interface AttRecord {
+  id: string          // documentId
+  eventId: string
+  eventName: string
+  studentId: string
+  name: string
+  yearLevel: string
+  dept: string
+  date: string
+  timeIn: string
+}
+
+function mapAttRecord(d: any): AttRecord {
+  return {
+    id: d.documentId,
+    eventId: d.eventId ?? '',
+    eventName: d.eventName ?? '',
+    studentId: d.studentId ?? '',
+    name: d.name ?? '',
+    yearLevel: d.yearLevel ?? '',
+    dept: d.dept ?? '',
+    date: d.date ?? '',
+    timeIn: d.timeIn ?? '',
+  }
+}
+
+export async function fetchAttRecords(): Promise<AttRecord[]> {
+  const PAGE = 200
+  let page = 1
+  const all: AttRecord[] = []
+  while (true) {
+    const res = await fetch(`${BASE}/att-records?pagination[page]=${page}&pagination[pageSize]=${PAGE}&sort=createdAt:DESC`, { headers })
+    if (!res.ok) throw new Error(`fetchAttRecords failed: ${res.status}`)
+    const json = await res.json()
+    all.push(...json.data.map(mapAttRecord))
+    if (all.length >= json.meta.pagination.total) break
+    page++
+  }
+  return all
+}
+
+export async function createAttRecord(data: Omit<AttRecord, 'id'>): Promise<AttRecord> {
+  const res = await fetch(`${BASE}/att-records`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`createAttRecord failed: ${res.status}`)
+  return mapAttRecord((await res.json()).data)
+}
+
+export async function deleteAttRecord(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/att-records/${id}`, { method: 'DELETE', headers })
+  if (!res.ok) throw new Error(`deleteAttRecord failed: ${res.status}`)
+}
+
+export async function deleteAllAttRecords(): Promise<void> {
+  const all = await fetchAttRecords()
+  await Promise.all(all.map(r => deleteAttRecord(r.id)))
+}
+
+// ── att-logout ────────────────────────────────────────────────────────────────
+export interface AttLogout {
+  id: string          // documentId
+  eventId: string
+  eventName: string
+  studentId: string
+  name: string
+  yearLevel: string
+  dept: string
+  date: string
+  timeOut: string
+}
+
+function mapAttLogout(d: any): AttLogout {
+  return {
+    id: d.documentId,
+    eventId: d.eventId ?? '',
+    eventName: d.eventName ?? '',
+    studentId: d.studentId ?? '',
+    name: d.name ?? '',
+    yearLevel: d.yearLevel ?? '',
+    dept: d.dept ?? '',
+    date: d.date ?? '',
+    timeOut: d.timeOut ?? '',
+  }
+}
+
+export async function fetchAttLogouts(): Promise<AttLogout[]> {
+  const PAGE = 200
+  let page = 1
+  const all: AttLogout[] = []
+  while (true) {
+    const res = await fetch(`${BASE}/att-logouts?pagination[page]=${page}&pagination[pageSize]=${PAGE}&sort=createdAt:DESC`, { headers })
+    if (!res.ok) throw new Error(`fetchAttLogouts failed: ${res.status}`)
+    const json = await res.json()
+    all.push(...json.data.map(mapAttLogout))
+    if (all.length >= json.meta.pagination.total) break
+    page++
+  }
+  return all
+}
+
+export async function createAttLogout(data: Omit<AttLogout, 'id'>): Promise<AttLogout> {
+  const res = await fetch(`${BASE}/att-logouts`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`createAttLogout failed: ${res.status}`)
+  return mapAttLogout((await res.json()).data)
+}
+
+export async function deleteAllAttLogouts(): Promise<void> {
+  const all = await fetchAttLogouts()
+  await Promise.all(all.map(r => {
+    return fetch(`${BASE}/att-logouts/${r.id}`, { method: 'DELETE', headers })
+  }))
+}
+
+// ── att-winner ────────────────────────────────────────────────────────────────
+export interface AttWinner {
+  id: string          // documentId
+  studentId: string
+  name: string
+  yearLevel: string
+  eventId: string
+  eventName: string
+  drawDate: string
+}
+
+function mapAttWinner(d: any): AttWinner {
+  return {
+    id: d.documentId,
+    studentId: d.studentId ?? '',
+    name: d.name ?? '',
+    yearLevel: d.yearLevel ?? '',
+    eventId: d.eventId ?? '',
+    eventName: d.eventName ?? '',
+    drawDate: d.drawDate ?? '',
+  }
+}
+
+export async function fetchAttWinners(): Promise<AttWinner[]> {
+  const PAGE = 200
+  let page = 1
+  const all: AttWinner[] = []
+  while (true) {
+    const res = await fetch(`${BASE}/att-winners?pagination[page]=${page}&pagination[pageSize]=${PAGE}&sort=createdAt:DESC`, { headers })
+    if (!res.ok) throw new Error(`fetchAttWinners failed: ${res.status}`)
+    const json = await res.json()
+    all.push(...json.data.map(mapAttWinner))
+    if (all.length >= json.meta.pagination.total) break
+    page++
+  }
+  return all
+}
+
+export async function createAttWinner(data: Omit<AttWinner, 'id'>): Promise<AttWinner> {
+  const res = await fetch(`${BASE}/att-winners`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`createAttWinner failed: ${res.status}`)
+  return mapAttWinner((await res.json()).data)
+}
+
+export async function deleteAttWinner(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/att-winners/${id}`, { method: 'DELETE', headers })
+  if (!res.ok) throw new Error(`deleteAttWinner failed: ${res.status}`)
+}
+
+export async function deleteAllAttWinners(eventId?: string): Promise<void> {
+  const all = await fetchAttWinners()
+  const toDelete = eventId ? all.filter(w => w.eventId === eventId) : all
+  await Promise.all(toDelete.map(w => deleteAttWinner(w.id)))
+}
+
+// ── att-setting (singleType) ──────────────────────────────────────────────────
+export interface AttSetting {
+  acadYear: string
+  dept: string
+  allowDuplicate: boolean
+  raffleAttendeeOnly: boolean
+  activeEventId: string
+  loginMode: 'login' | 'logout'
+}
+
+function mapAttSetting(d: any): AttSetting {
+  return {
+    acadYear: d.acadYear ?? '2025-2026',
+    dept: d.dept ?? 'College of Computer Studies',
+    allowDuplicate: d.allowDuplicate ?? false,
+    raffleAttendeeOnly: d.raffleAttendeeOnly ?? true,
+    activeEventId: d.activeEventId ?? '',
+    loginMode: d.loginMode === 'logout' ? 'logout' : 'login',
+  }
+}
+
+export async function fetchAttSetting(): Promise<AttSetting> {
+  const res = await fetch(`${BASE}/att-setting`, { headers })
+  // 404 means not yet created — return defaults
+  if (res.status === 404 || res.status === 500) {
+    return { acadYear: '2025-2026', dept: 'College of Computer Studies', allowDuplicate: false, raffleAttendeeOnly: true, activeEventId: '', loginMode: 'login' }
+  }
+  if (!res.ok) throw new Error(`fetchAttSetting failed: ${res.status}`)
+  const json = await res.json()
+  return mapAttSetting(json.data)
+}
+
+export async function saveAttSetting(data: AttSetting): Promise<void> {
+  // singleType uses PUT to create-or-update
+  const res = await fetch(`${BASE}/att-setting`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) throw new Error(`saveAttSetting failed: ${res.status}`)
+}

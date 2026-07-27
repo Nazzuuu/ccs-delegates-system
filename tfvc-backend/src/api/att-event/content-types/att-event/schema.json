@@ -1,0 +1,19 @@
+{
+  "kind": "collectionType",
+  "collectionName": "att_events",
+  "info": {
+    "singularName": "att-event",
+    "pluralName": "att-events",
+    "displayName": "Att Event",
+    "description": "Attendance system events"
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "name":  { "type": "string",  "required": true },
+    "type":  { "type": "string",  "required": true },
+    "date":  { "type": "string",  "required": true },
+    "venue": { "type": "string" },
+    "status":{ "type": "string", "default": "upcoming" }
+  }
+}

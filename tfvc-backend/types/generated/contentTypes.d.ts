@@ -476,6 +476,213 @@ export interface ApiAppUserAppUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiAttEventAttEvent extends Struct.CollectionTypeSchema {
+  collectionName: 'att_events';
+  info: {
+    description: 'Attendance system events';
+    displayName: 'Att Event';
+    pluralName: 'att-events';
+    singularName: 'att-event';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    date: Schema.Attribute.String & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::att-event.att-event'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.String & Schema.Attribute.DefaultTo<'upcoming'>;
+    type: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    venue: Schema.Attribute.String;
+  };
+}
+
+export interface ApiAttLogoutAttLogout extends Struct.CollectionTypeSchema {
+  collectionName: 'att_logouts';
+  info: {
+    description: 'Attendance logout records';
+    displayName: 'Att Logout';
+    pluralName: 'att-logouts';
+    singularName: 'att-logout';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    date: Schema.Attribute.String;
+    dept: Schema.Attribute.String;
+    eventId: Schema.Attribute.String & Schema.Attribute.Required;
+    eventName: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::att-logout.att-logout'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    studentId: Schema.Attribute.String & Schema.Attribute.Required;
+    timeOut: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    yearLevel: Schema.Attribute.String;
+  };
+}
+
+export interface ApiAttRecordAttRecord extends Struct.CollectionTypeSchema {
+  collectionName: 'att_records';
+  info: {
+    description: 'Attendance login records';
+    displayName: 'Att Record';
+    pluralName: 'att-records';
+    singularName: 'att-record';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    date: Schema.Attribute.String;
+    dept: Schema.Attribute.String;
+    eventId: Schema.Attribute.String & Schema.Attribute.Required;
+    eventName: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::att-record.att-record'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    studentId: Schema.Attribute.String & Schema.Attribute.Required;
+    timeIn: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    yearLevel: Schema.Attribute.String;
+  };
+}
+
+export interface ApiAttSettingAttSetting extends Struct.SingleTypeSchema {
+  collectionName: 'att_settings';
+  info: {
+    description: 'Attendance system global settings';
+    displayName: 'Att Setting';
+    pluralName: 'att-settings';
+    singularName: 'att-setting';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    acadYear: Schema.Attribute.String & Schema.Attribute.DefaultTo<'2025-2026'>;
+    activeEventId: Schema.Attribute.String & Schema.Attribute.DefaultTo<''>;
+    allowDuplicate: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dept: Schema.Attribute.String & Schema.Attribute.DefaultTo<'CCS'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::att-setting.att-setting'
+    > &
+      Schema.Attribute.Private;
+    loginMode: Schema.Attribute.String & Schema.Attribute.DefaultTo<'login'>;
+    publishedAt: Schema.Attribute.DateTime;
+    raffleAttendeeOnly: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiAttStudentAttStudent extends Struct.CollectionTypeSchema {
+  collectionName: 'att_students';
+  info: {
+    description: 'Attendance system students';
+    displayName: 'Att Student';
+    pluralName: 'att-students';
+    singularName: 'att-student';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dept: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::att-student.att-student'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    studentId: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    yearLevel: Schema.Attribute.String & Schema.Attribute.Required;
+  };
+}
+
+export interface ApiAttWinnerAttWinner extends Struct.CollectionTypeSchema {
+  collectionName: 'att_winners';
+  info: {
+    description: 'Raffle winners';
+    displayName: 'Att Winner';
+    pluralName: 'att-winners';
+    singularName: 'att-winner';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    drawDate: Schema.Attribute.String;
+    eventId: Schema.Attribute.String;
+    eventName: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::att-winner.att-winner'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    studentId: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    yearLevel: Schema.Attribute.String;
+  };
+}
+
 export interface ApiDelegateDelegate extends Struct.CollectionTypeSchema {
   collectionName: 'delegates';
   info: {
@@ -1030,6 +1237,12 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::app-user.app-user': ApiAppUserAppUser;
+      'api::att-event.att-event': ApiAttEventAttEvent;
+      'api::att-logout.att-logout': ApiAttLogoutAttLogout;
+      'api::att-record.att-record': ApiAttRecordAttRecord;
+      'api::att-setting.att-setting': ApiAttSettingAttSetting;
+      'api::att-student.att-student': ApiAttStudentAttStudent;
+      'api::att-winner.att-winner': ApiAttWinnerAttWinner;
       'api::delegate.delegate': ApiDelegateDelegate;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
