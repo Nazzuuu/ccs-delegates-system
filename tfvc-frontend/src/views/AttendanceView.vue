@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 // CCS Attendance System — Strapi Backend (Railway)
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { login, logout, currentUser, isSuperAdmin } from '../composables/useAuth'
@@ -1044,6 +1044,19 @@ const paidCurrentPage = ref(1)
 const PAID_PAGE_SIZE  = 15
 const paidYearLevels  = ['All', 'First Year', 'Second Year', 'Third Year', 'Fourth Year']
 
+// ── Paid dashboard stats ───────────────────────────────────────────────────
+const paidFirstDayCount  = computed(() => paidRows.value.filter(r => r.status === 'First Day').length)
+const paidSecondDayCount = computed(() => paidRows.value.filter(r => r.status === 'Second Day').length)
+const paidNoTagCount     = computed(() => paidRows.value.filter(r => !r.status).length)
+
+// ── View list modal ────────────────────────────────────────────────────────
+const paidViewListModal  = ref<'First Day' | 'Second Day' | null>(null)
+const paidViewListRows   = computed(() =>
+  paidViewListModal.value
+    ? paidRows.value.filter(r => r.status === paidViewListModal.value)
+    : []
+)
+
 // Display helper: convert Strapi year level to short form for UI
 function shortYear(y: string): string {
   const m: Record<string, string> = {
@@ -1636,7 +1649,7 @@ onMounted(() => {
               </select>
               <select v-model="stuYearFilter" class="input-search w-40">
                 <option value="">All Years</option>
-                <option value="First Year">1st Year</option><option value="Second Year">2nd Year</option><option value="Third Year">3rd Year</option><option value="Fourth Year">4th Year</option>
+                <option value="1st Year">1st Year</option><option value="2nd Year">2nd Year</option><option value="3rd Year">3rd Year</option><option value="4th Year">4th Year</option>
               </select>
               <button @click="openImportDialog" class="btn-secondary flex items-center gap-2 text-sm">
                 <span class="w-6 h-6 rounded-full bg-sync-green/10 text-sync-green flex items-center justify-center text-base font-bold">+</span>
@@ -2052,6 +2065,40 @@ onMounted(() => {
               </div>
             </div>
 
+            <!-- Paid day dashboard stats -->
+            <div v-if="paidRows.length > 0" class="grid grid-cols-3 gap-3 sm:gap-4">
+              <!-- 1st Day -->
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-900 p-4 flex flex-col gap-1">
+                <p class="text-xs font-semibold uppercase tracking-wide text-blue-500">1st Day</p>
+                <p class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ paidFirstDayCount }}</p>
+                <button
+                  @click="paidViewListModal = 'First Day'"
+                  class="mt-1 inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors w-fit"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  View List
+                </button>
+              </div>
+              <!-- 2nd Day -->
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-emerald-200 dark:border-emerald-900 p-4 flex flex-col gap-1">
+                <p class="text-xs font-semibold uppercase tracking-wide text-emerald-500">2nd Day</p>
+                <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ paidSecondDayCount }}</p>
+                <button
+                  @click="paidViewListModal = 'Second Day'"
+                  class="mt-1 inline-flex items-center gap-1.5 text-xs text-emerald-500 hover:text-emerald-700 font-medium transition-colors w-fit"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  View List
+                </button>
+              </div>
+              <!-- No tag -->
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-1">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">No Tag</p>
+                <p class="text-3xl font-bold text-gray-400">{{ paidNoTagCount }}</p>
+                <p class="text-xs text-gray-300 dark:text-gray-600 mt-1">Not yet assigned</p>
+              </div>
+            </div>
+
             <!-- Filters -->
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
               <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -2203,8 +2250,92 @@ onMounted(() => {
                 </div>
               </div>
             </div>
-          </div>
 
+            <!-- View List Modal -->
+            <Teleport to="body">
+              <Transition name="fade">
+                <div
+                  v-if="paidViewListModal"
+                  class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                  @click.self="paidViewListModal = null"
+                >
+                  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                    <!-- Modal Header -->
+                    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+                      <div class="flex items-center gap-3">
+                        <span
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                          :class="paidViewListModal === 'First Day'
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                            : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'"
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                          </svg>
+                          {{ paidViewListModal === 'First Day' ? '1st Day' : '2nd Day' }}
+                        </span>
+                        <h2 class="text-base font-bold text-gray-900 dark:text-white">
+                          {{ paidViewListModal === 'First Day' ? '1st Day' : '2nd Day' }} Delegates
+                        </h2>
+                        <span class="text-xs text-gray-400 font-medium">({{ paidViewListRows.length }})</span>
+                      </div>
+                      <button
+                        @click="paidViewListModal = null"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        aria-label="Close"
+                      >
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <!-- Modal Body -->
+                    <div class="overflow-y-auto flex-1">
+                      <div v-if="paidViewListRows.length === 0" class="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
+                        <svg class="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        <p class="text-sm">No delegates found</p>
+                      </div>
+                      <table v-else class="w-full">
+                        <thead class="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+                          <tr>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide w-10">#</th>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Student ID</th>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Year Level</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                          <tr
+                            v-for="(r, i) in paidViewListRows"
+                            :key="r.id"
+                            class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                          >
+                            <td class="px-5 py-3 text-xs text-gray-400">{{ i + 1 }}</td>
+                            <td class="px-5 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">{{ r.studentId }}</td>
+                            <td class="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">{{ r.name }}</td>
+                            <td class="px-5 py-3 text-xs text-gray-500 dark:text-gray-400">{{ shortYear(r.yearLevel) }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <!-- Modal Footer -->
+                    <div class="px-6 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+                      <button
+                        @click="paidViewListModal = null"
+                        class="btn-secondary text-sm px-4 py-2"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </Transition>
+            </Teleport>
+
+          </div>
           <!-- â•â• SETTINGS â•â• -->
           <!-- Settings -->
           <div v-else-if="activePage === 'settings'" class="space-y-6">
