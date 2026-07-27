@@ -1603,6 +1603,7 @@ onMounted(() => {
                     </tr>
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
 
@@ -1638,6 +1639,7 @@ onMounted(() => {
                     </tr>
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           </div>
@@ -1733,6 +1735,7 @@ onMounted(() => {
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
 
