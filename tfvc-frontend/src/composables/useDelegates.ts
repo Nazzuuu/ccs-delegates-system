@@ -4,6 +4,7 @@ import {
   updateDelegate,
   createDelegate,
   deleteDelegate,
+  syncDelegateEdit,
   type StrapiDelegate,
 } from '../api/strapi'
 
@@ -143,10 +144,27 @@ export function useDelegates() {
     // Check for duplicate name (excluding self)
     const duplicate = delegates.value.find(x => x.id !== id && x.name.toUpperCase() === name.toUpperCase())
     if (duplicate) throw new Error(`"${name}" already exists in the list (${duplicate.yearLevel}).`)
+
+    // Capture old values before mutating
+    const oldStudentId = d.studentId
+    const oldName      = d.name
+
+    // 1. Save to CCS delegates system
     await updateDelegate(d.documentId, { studentId, name, yearLevel })
     d.studentId = studentId
     d.name      = name
     d.yearLevel = yearLevel
+
+    // 2. Silently propagate to attendance system (non-blocking — errors don't fail the edit)
+    syncDelegateEdit({
+      oldStudentId,
+      oldName,
+      newStudentId: studentId,
+      newName: name,
+      newYearLevel: yearLevel,
+    }).catch(() => {
+      // Attendance sync failure is non-critical; the delegate edit itself succeeded.
+    })
   }
 
   return {

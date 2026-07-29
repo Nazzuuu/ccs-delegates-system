@@ -599,3 +599,71 @@ export async function saveAttSetting(data: AttSetting): Promise<void> {
   })
   if (!res.ok) throw new Error(`saveAttSetting failed: ${res.status}`)
 }
+
+// ── Cross-system sync: delegate edit → attendance system ──────────────────────
+export interface DelegateSyncPayload {
+  oldStudentId: string
+  oldName: string
+  newStudentId: string
+  newName: string
+  newYearLevel: string
+}
+
+/**
+ * After editing a delegate's name/studentId/yearLevel in the CCS delegates system,
+ * propagate those changes to ALL tables in the attendance system that store
+ * denormalized student info: att-students, att-records, att-logouts, att-winners.
+ *
+ * Matching strategy (in priority order):
+ *   1. If oldStudentId is non-empty → match by studentId
+ *   2. Otherwise → match by name (case-insensitive)
+ */
+export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<void> {
+  const { oldStudentId, oldName, newStudentId, newName, newYearLevel } = payload
+
+  const matchById   = (id: string) => oldStudentId ? id === oldStudentId : false
+  const matchByName = (n: string)  => n.toLowerCase().trim() === oldName.toLowerCase().trim()
+  const matches     = (id: string, n: string) => matchById(id) || matchByName(n)
+
+  // Run all four collection fetches in parallel
+  const [attStudents, attRecords, attLogouts, attWinners] = await Promise.all([
+    fetchAttStudents(),
+    fetchAttRecords(),
+    fetchAttLogouts(),
+    fetchAttWinners(),
+  ])
+
+  // ── att-students ──
+  const studentsToUpdate = attStudents.filter(s => matches(s.studentId, s.name))
+  // ── att-records ──
+  const recordsToUpdate  = attRecords.filter(r  => matches(r.studentId,  r.name))
+  // ── att-logouts ──
+  const logoutsToUpdate  = attLogouts.filter(l  => matches(l.studentId,  l.name))
+  // ── att-winners ──
+  const winnersToUpdate  = attWinners.filter(w  => matches(w.studentId,  w.name))
+
+  // Fire all updates in parallel (batched per collection)
+  await Promise.all([
+    ...studentsToUpdate.map(s =>
+      updateAttStudent(s.id, { studentId: newStudentId, name: newName, yearLevel: newYearLevel })
+    ),
+    ...recordsToUpdate.map(r =>
+      fetch(`${BASE}/att-records/${r.id}`, {
+        method: 'PUT', headers,
+        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: newYearLevel } }),
+      })
+    ),
+    ...logoutsToUpdate.map(l =>
+      fetch(`${BASE}/att-logouts/${l.id}`, {
+        method: 'PUT', headers,
+        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: newYearLevel } }),
+      })
+    ),
+    ...winnersToUpdate.map(w =>
+      fetch(`${BASE}/att-winners/${w.id}`, {
+        method: 'PUT', headers,
+        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: newYearLevel } }),
+      })
+    ),
+  ])
+}
