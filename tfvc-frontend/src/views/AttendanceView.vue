@@ -2599,7 +2599,7 @@ onMounted(() => {
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Student ID</label>
-          <input v-model="stuForm.studentId" type="text" class="input-search w-full" :disabled="!!editStuId" />
+          <input v-model="stuForm.studentId" type="text" class="input-search w-full" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Full Name</label>
