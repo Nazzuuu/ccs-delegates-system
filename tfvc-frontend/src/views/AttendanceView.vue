@@ -1542,33 +1542,62 @@ const rptPaginated  = computed(() => rptList.value.slice((rptPage.value - 1) * R
 function rptPrevPage() { if (rptPage.value > 1) rptPage.value-- }
 function rptNextPage() { if (rptPage.value < rptTotalPages.value) rptPage.value++ }
 
-// Export CSV for attendance reports
+// Export XLSX for attendance reports (fixes #### column-too-narrow issue in Excel)
 function rptExportCSV() {
+  const XLSX = (window as any).XLSX
+  if (!XLSX) { toast('Excel library not loaded.', 'error'); return }
+
   let rows: any[][]
+  let colWidths: { wch: number }[]
+
   if (rptTab.value === 'completed') {
     rows = [
       ['#', 'Student ID', 'Name', 'Year Level', 'Dept', 'Event', 'Date', 'Time In', 'Time Out', 'Day'],
       ...completedFiltered.value.map((r, i) => [
-        i + 1, r.studentId, r.name, r.yearLevel, r.dept, r.eventName, r.date, r.timeIn, r.timeOut, r.paidDay ?? '',
+        i + 1, r.studentId, r.name, r.yearLevel, r.dept, r.eventName, r.date, r.timeIn, r.timeOut ?? '', r.paidDay ?? '',
       ]),
+    ]
+    colWidths = [
+      { wch: 5 },  // #
+      { wch: 14 }, // Student ID
+      { wch: 28 }, // Name
+      { wch: 12 }, // Year Level
+      { wch: 10 }, // Dept
+      { wch: 30 }, // Event
+      { wch: 14 }, // Date
+      { wch: 12 }, // Time In
+      { wch: 12 }, // Time Out
+      { wch: 14 }, // Day
     ]
   } else {
     rows = [
       ['#', 'Student ID', 'Name', 'Year Level', 'Dept', 'Event', 'Date', 'Time In', 'Day'],
       ...loginList.value.map((r, i) => [
         i + 1, r.studentId, r.name, r.yearLevel, r.dept, r.eventName, r.date, r.timeIn,
-        paidDayMap.value.get(paidDayKeyOf(r.name)) ?? '',
+        r.paidDay ?? '',
       ]),
     ]
+    colWidths = [
+      { wch: 5 },  // #
+      { wch: 14 }, // Student ID
+      { wch: 28 }, // Name
+      { wch: 12 }, // Year Level
+      { wch: 10 }, // Dept
+      { wch: 30 }, // Event
+      { wch: 14 }, // Date
+      { wch: 12 }, // Time In
+      { wch: 14 }, // Day
+    ]
   }
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = `attendance-report-${rptTab.value}-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  ws['!cols'] = colWidths
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendance')
+
+  const filename = `attendance-report-${rptTab.value}-${new Date().toISOString().slice(0, 10)}.xlsx`
+  XLSX.writeFile(wb, filename)
 }
 
 const paidFiltered = computed(() =>
@@ -2942,7 +2971,7 @@ onMounted(() => {
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                   </svg>
-                  Export CSV
+                  Export XLSX
                 </button>
               </div>
             </div>
