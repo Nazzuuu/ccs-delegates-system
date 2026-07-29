@@ -342,6 +342,25 @@ const dashTotalCompleted = computed(() => {
   return [...loggedInIds].filter(id => loggedOutIds.has(id)).length
 })
 
+// ── 1st Day / 2nd Day stats ─────────────────────────────────────────────────
+// Based on att-students[].paidDay field
+const dashTotalFirstDay  = computed(() => students.value.filter(s => s.paidDay === 'First Day').length)
+const dashTotalSecondDay = computed(() => students.value.filter(s => s.paidDay === 'Second Day').length)
+
+// Students who are tagged as 1st/2nd Day AND have a login record for active event today
+const dashFirstDayLogins = computed(() => {
+  const firstDayIds = new Set(students.value.filter(s => s.paidDay === 'First Day').map(s => s.studentId))
+  return new Set(
+    activeEventAttendance.value.filter(a => a.date === nowDate() && firstDayIds.has(a.studentId)).map(a => a.studentId)
+  ).size
+})
+const dashSecondDayLogins = computed(() => {
+  const secondDayIds = new Set(students.value.filter(s => s.paidDay === 'Second Day').map(s => s.studentId))
+  return new Set(
+    activeEventAttendance.value.filter(a => a.date === nowDate() && secondDayIds.has(a.studentId)).map(a => a.studentId)
+  ).size
+})
+
 // ── Dashboard bar chart data ────────────────────────────────────────────────
 const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 function sameYear(a: string, b: string) {
@@ -360,7 +379,7 @@ const dashChartData = computed(() => {
 })
 
 // ── Dashboard modal ────────────────────────────────────────────────────────
-type DashModalType = 'students' | 'logins' | 'logouts' | 'completed'
+type DashModalType = 'students' | 'logins' | 'logouts' | 'completed' | 'firstday' | 'secondday'
 const dashModal = ref<{ show: boolean; type: DashModalType | null }>({ show: false, type: null })
 const dashModalSearch = ref('')
 const dashModalYear   = ref('')
@@ -403,6 +422,14 @@ const dashModalRows = computed<DashRow[]>(() => {
     rows = activeEventAttendance.value
       .filter(a => { if (seen.has(a.studentId)) return false; seen.add(a.studentId); return true })
       .map(a => ({ studentId: a.studentId, name: a.name, yearLevel: a.yearLevel, dept: a.dept, status: 'Completed', timeIn: a.timeIn, date: a.date }))
+  } else if (type === 'firstday') {
+    rows = students.value
+      .filter(s => s.paidDay === 'First Day')
+      .map(s => ({ studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept, status: 'First Day' }))
+  } else if (type === 'secondday') {
+    rows = students.value
+      .filter(s => s.paidDay === 'Second Day')
+      .map(s => ({ studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept, status: 'Second Day' }))
   }
 
   // filter
@@ -423,6 +450,8 @@ const dashModalTitle = computed(() => {
     case 'logins':    return `Logged In Today — ${attEventInfo?.value?.name ?? 'Active Event'}`
     case 'logouts':   return 'All Attendance Records'
     case 'completed': return `Completed — ${attEventInfo?.value?.name ?? 'Active Event'}`
+    case 'firstday':  return '1st Day Students'
+    case 'secondday': return '2nd Day Students'
     default: return ''
   }
 })
@@ -1575,6 +1604,59 @@ onMounted(() => {
 
             </div>
 
+            <!-- 1st Day / 2nd Day cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              <!-- 1st Day -->
+              <button @click="openDashModal('firstday')"
+                class="group bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 border-l-4 border-l-sky-500 p-5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 cursor-pointer w-full">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">1st Day</p>
+                    <p class="text-4xl font-bold text-sky-600 dark:text-sky-400">{{ dashTotalFirstDay }}</p>
+                    <p class="text-xs text-gray-400 mt-1">registered students</p>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Logged In</p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ dashFirstDayLogins }}</p>
+                    <p class="text-xs mt-1" :class="dashTotalFirstDay > 0 && dashFirstDayLogins >= dashTotalFirstDay ? 'text-green-500 font-semibold' : 'text-gray-400'">
+                      {{ dashTotalFirstDay > 0 ? Math.round(dashFirstDayLogins / dashTotalFirstDay * 100) : 0 }}%
+                      <span v-if="dashTotalFirstDay > 0 && dashFirstDayLogins >= dashTotalFirstDay" class="ml-1">✓ Complete</span>
+                    </p>
+                  </div>
+                </div>
+                <span class="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-sky-500 bg-sky-50 dark:bg-sky-900/30 px-2.5 py-1 rounded-full group-hover:bg-sky-100 transition-colors">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  View list
+                </span>
+              </button>
+
+              <!-- 2nd Day -->
+              <button @click="openDashModal('secondday')"
+                class="group bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 border-l-4 border-l-violet-500 p-5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 cursor-pointer w-full">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">2nd Day</p>
+                    <p class="text-4xl font-bold text-violet-600 dark:text-violet-400">{{ dashTotalSecondDay }}</p>
+                    <p class="text-xs text-gray-400 mt-1">registered students</p>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Logged In</p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ dashSecondDayLogins }}</p>
+                    <p class="text-xs mt-1" :class="dashTotalSecondDay > 0 && dashSecondDayLogins >= dashTotalSecondDay ? 'text-green-500 font-semibold' : 'text-gray-400'">
+                      {{ dashTotalSecondDay > 0 ? Math.round(dashSecondDayLogins / dashTotalSecondDay * 100) : 0 }}%
+                      <span v-if="dashTotalSecondDay > 0 && dashSecondDayLogins >= dashTotalSecondDay" class="ml-1">✓ Complete</span>
+                    </p>
+                  </div>
+                </div>
+                <span class="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-violet-500 bg-violet-50 dark:bg-violet-900/30 px-2.5 py-1 rounded-full group-hover:bg-violet-100 transition-colors">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  View list
+                </span>
+              </button>
+
+            </div>
+
             <!-- Attendance bar chart -->
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
               <div class="flex items-center justify-between mb-5">
@@ -2543,7 +2625,7 @@ onMounted(() => {
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Year</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Dept</th>
               <th v-if="dashModal.type !== 'students'" class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th v-if="dashModal.type !== 'students'" class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
+              <th v-if="dashModal.type !== 'students' && dashModal.type !== 'firstday' && dashModal.type !== 'secondday'" class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
             </tr></thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
               <tr v-for="row in dashModalRows" :key="row.studentId + (row.timeIn ?? '')" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
@@ -2551,8 +2633,8 @@ onMounted(() => {
                 <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.name }}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ shortYear(row.yearLevel) }}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ row.dept }}</td>
-                <td v-if="dashModal.type !== 'students'" class="px-4 py-3"><span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold', row.status === 'Logged In' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : row.status === 'Completed' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400']">{{ row.status }}</span></td>
-                <td v-if="dashModal.type !== 'students'" class="px-4 py-3 text-xs text-gray-400">{{ row.date }} {{ row.timeIn }}</td>
+                <td v-if="dashModal.type !== 'students'" class="px-4 py-3"><span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold', row.status === 'Logged In' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : row.status === 'Completed' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' : row.status === 'First Day' ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : row.status === 'Second Day' ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400']">{{ row.status }}</span></td>
+                <td v-if="dashModal.type !== 'students' && dashModal.type !== 'firstday' && dashModal.type !== 'secondday'" class="px-4 py-3 text-xs text-gray-400">{{ row.date }} {{ row.timeIn }}</td>
               </tr>
             </tbody>
           </table>
