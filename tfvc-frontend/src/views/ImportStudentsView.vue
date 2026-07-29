@@ -135,10 +135,10 @@ const importResult     = ref<{ added: number; skipped: string[]; failed: string[
 
 // Valid year level aliases from the file → canonical value
 const YEAR_MAP: Record<string, string> = {
-  'first year':  'First Year',  '1st year': 'First Year',  '1': 'First Year',
-  'second year': 'Second Year', '2nd year': 'Second Year', '2': 'Second Year',
-  'third year':  'Third Year',  '3rd year': 'Third Year',  '3': 'Third Year',
-  'fourth year': 'Fourth Year', '4th year': 'Fourth Year', '4': 'Fourth Year',
+  'first year':  'First Year',  '1st year': 'First Year',  '1': 'First Year', '1st': 'First Year',
+  'second year': 'Second Year', '2nd year': 'Second Year', '2': 'Second Year', '2nd': 'Second Year',
+  'third year':  'Third Year',  '3rd year': 'Third Year',  '3': 'Third Year', '3rd': 'Third Year',
+  'fourth year': 'Fourth Year', '4th year': 'Fourth Year', '4': 'Fourth Year', '4th': 'Fourth Year',
 }
 
 function openImportModal() {
@@ -183,19 +183,22 @@ function onFileChange(e: Event) {
       const headers: string[] = headerRow.map((h: any) => String(h).toLowerCase().trim())
       const nameCol = headers.findIndex(h => h.includes('name'))
       const yearCol = headers.findIndex(h => h.includes('year'))
-      
+      const idCol   = headers.findIndex(h => h.includes('studentid') || h.includes('student id') || h === 'id' || h.includes('studentno') || h.includes('student no'))
 
       if (nameCol === -1) { importParseError.value = 'Could not find a "name" column in the file.'; return }
       if (yearCol === -1) { importParseError.value = 'Could not find a "year" column in the file.'; return }
+      if (idCol === -1)   { importParseError.value = 'Could not find a "studentId" column in the file. Add a column named "studentId" or "Student ID".'; return }
 
       const rows: ImportRow[] = []
       for (let i = 1; i < raw.length; i++) {
         const row  = raw[i]
-       const name = String(row?.[nameCol] ?? '').trim()
-      const rawYear = String(row?.[yearCol] ?? '').trim().toLowerCase()
+        const name = String(row?.[nameCol] ?? '').trim()
+        const rawYear = String(row?.[yearCol] ?? '').trim().toLowerCase()
         const year = YEAR_MAP[rawYear] ?? ''
+        const studentId = String(row?.[idCol] ?? '').trim()
         if (!name) continue
-        rows.push({ name, yearLevel: year })
+        if (!studentId) continue   // studentId is required — skip rows without it
+        rows.push({ name, yearLevel: year, studentId })
       }
 
       if (rows.length === 0) { importParseError.value = 'No valid data rows found after the header.'; return }
@@ -370,8 +373,9 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
                 Upload a <strong>.csv</strong> or <strong>.xlsx / .xls</strong> file. The file must have at least two columns:
               </p>
               <ul class="text-xs text-gray-500 dark:text-gray-400 space-y-1 pl-4 list-disc">
+                <li><span class="font-mono font-semibold text-gray-700 dark:text-gray-200">studentId</span> — student ID number (e.g. 4261124) <span class="text-red-500 font-semibold">required</span></li>
                 <li><span class="font-mono font-semibold text-gray-700 dark:text-gray-200">name</span> — full name (e.g. DELA CRUZ, JUAN)</li>
-                <li><span class="font-mono font-semibold text-gray-700 dark:text-gray-200">yearLevel</span> — First Year / Second Year / Third Year / Fourth Year</li>
+                <li><span class="font-mono font-semibold text-gray-700 dark:text-gray-200">yearLevel</span> — 1st Year / 2nd Year / 3rd Year / 4th Year</li>
               </ul>
               <!-- File drop zone -->
               <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl px-4 py-8 cursor-pointer hover:border-sync-green hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors group">
@@ -408,12 +412,14 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
               <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
                 <table class="w-full text-xs">
                   <thead><tr>
+                    <th class="table-th py-2">Student ID</th>
                     <th class="table-th py-2">Name</th>
                     <th class="table-th py-2">Year Level</th>
                     <th class="table-th py-2 text-center">Status</th>
                   </tr></thead>
                   <tbody>
                     <tr v-for="(r, i) in importRows.slice(0, 5)" :key="i" class="border-b border-gray-100 dark:border-gray-800 last:border-0">
+                      <td class="px-3 py-1.5 font-mono text-gray-500 dark:text-gray-400">{{ r.studentId || '—' }}</td>
                       <td class="px-3 py-1.5 text-gray-700 dark:text-gray-300">{{ r.name }}</td>
                       <td class="px-3 py-1.5 text-gray-500 dark:text-gray-400">{{ r.yearLevel || '—' }}</td>
                       <td class="px-3 py-1.5 text-center">
