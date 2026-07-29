@@ -965,6 +965,7 @@ async function clearAllData() {
     // Also clear paid data — paidRows and the localStorage paidDay map
     paidRows.value   = []
     localStorage.removeItem(PAID_DAY_KEY)
+    loadBackupMeta()
     toast('All data cleared.', 'info')
   } catch (e: any) { toast('Failed to clear data: ' + e.message, 'error') }
 }
@@ -978,6 +979,7 @@ async function clearAttendanceOnly() {
     await Promise.all([deleteAllAttRecords(), deleteAllAttLogouts()])
     attendance.value = []
     logouts.value    = []
+    loadBackupMeta()
     toast('Attendance records cleared.', 'info')
   } catch (e: any) { toast('Failed to clear attendance: ' + e.message, 'error') }
 }
@@ -2820,7 +2822,7 @@ onMounted(() => {
                             </div>
 
               <!-- Row 3: Restore Database (full width, only when backup exists) -->
-              <div v-if="isSuperAdmin && hasBackup" class="xl:col-span-2 bg-white dark:bg-gray-900 rounded-xl border border-emerald-200 dark:border-emerald-900/50 p-5">
+              <div v-if="hasBackup" class="xl:col-span-2 bg-white dark:bg-gray-900 rounded-xl border border-emerald-200 dark:border-emerald-900/50 p-5">
                 <div class="flex items-center gap-2 border-b border-emerald-100 dark:border-emerald-900/40 pb-3 mb-4">
                   <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
