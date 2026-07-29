@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 // CCS Attendance System — Strapi Backend (Railway)
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { login, logout, currentUser, isSuperAdmin } from '../composables/useAuth'
@@ -120,7 +120,7 @@ const confettiPieces = Array.from({ length: 60 }, (_, i) => ({
   size: 6 + Math.random() * 8
 }))
 
-type PageKey = 'dashboard'|'students'|'events'|'attendance'|'raffle'|'paid'|'settings'
+type PageKey = 'dashboard'|'students'|'events'|'attendance'|'raffle'|'paid'|'reports'|'settings'
 const activePage  = ref<PageKey>('dashboard')
 const sidebarOpen = ref(true)
 const isMobile    = ref(false)
@@ -145,6 +145,8 @@ const navItems: Array<{ key: PageKey; label: string; icon: string }> = [
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/>` },
   { key: 'paid',       label: 'Paid',
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>` },
+  { key: 'reports',    label: 'Reports',
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>` },
 ]
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }
@@ -1422,6 +1424,139 @@ function shortYear(y: string): string {
     'Fourth Year': '4th Year',
   }
   return m[y] ?? y
+}
+
+// ── Reports (Attendance) ───────────────────────────────────────────────────
+// A student is "completed" if they have BOTH a login record AND a logout record
+// for the same event (matched by studentId or name).
+const rptFilterDay  = ref<'All' | 'First Day' | 'Second Day'>('All')
+const rptFilterYear = ref('')
+const rptSearch     = ref('')
+
+const rptLoggedIn = computed(() => attendance.value.length)
+const rptLoggedOut = computed(() => logouts.value.length)
+
+const rptCompleted = computed(() => {
+  // Build a set of studentIds that have a logout record
+  const logoutIds = new Set(logouts.value.map(l => l.studentId.trim()))
+  const logoutNames = new Set(logouts.value.map(l => l.name.trim().toUpperCase()))
+  return attendance.value.filter(r =>
+    logoutIds.has(r.studentId.trim()) || logoutNames.has(r.name.trim().toUpperCase())
+  ).length
+})
+
+// 1st Day vs 2nd Day counts (from att-students paidDay field + paidDayMap)
+const rpt1stDay = computed(() =>
+  students.value.filter(s => paidDayMap.value.get(paidDayKeyOf(s.name)) === 'First Day').length
+)
+const rpt2ndDay = computed(() =>
+  students.value.filter(s => paidDayMap.value.get(paidDayKeyOf(s.name)) === 'Second Day').length
+)
+
+// Detailed completed list: students who logged in AND logged out
+const completedList = computed(() => {
+  const logoutMap = new Map<string, LogoutRecord>()
+  logouts.value.forEach(l => {
+    // key by studentId; fallback to name
+    const key = l.studentId.trim() || l.name.trim().toUpperCase()
+    logoutMap.set(key, l)
+  })
+  return attendance.value
+    .filter(r => {
+      const key = r.studentId.trim() || r.name.trim().toUpperCase()
+      return logoutMap.has(key)
+    })
+    .map(r => {
+      const key = r.studentId.trim() || r.name.trim().toUpperCase()
+      const logoutRec = logoutMap.get(key)!
+      return {
+        studentId:  r.studentId,
+        name:       r.name,
+        yearLevel:  r.yearLevel,
+        dept:       r.dept,
+        eventName:  r.eventName,
+        date:       r.date,
+        timeIn:     r.timeIn,
+        timeOut:    logoutRec.timeOut,
+        paidDay:    paidDayMap.value.get(paidDayKeyOf(r.name)) ?? null,
+      }
+    })
+})
+
+const completedFiltered = computed(() => {
+  const q = rptSearch.value.toLowerCase()
+  return completedList.value.filter(r => {
+    const matchSearch = !q || r.studentId.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+    const matchYear   = !rptFilterYear.value || r.yearLevel.toLowerCase().trim() === rptFilterYear.value.toLowerCase().trim()
+    const matchDay    = rptFilterDay.value === 'All' || r.paidDay === rptFilterDay.value
+    return matchSearch && matchYear && matchDay
+  })
+})
+
+// Also build a simple loginOnly list for the full logged-in table
+const loginList = computed(() => {
+  const q = rptSearch.value.toLowerCase()
+  return attendance.value.filter(r => {
+    const matchSearch = !q || r.studentId.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+    const matchYear   = !rptFilterYear.value || r.yearLevel.toLowerCase().trim() === rptFilterYear.value.toLowerCase().trim()
+    const matchDay    = rptFilterDay.value === 'All' ||
+      (paidDayMap.value.get(paidDayKeyOf(r.name)) ?? null) === rptFilterDay.value
+    return matchSearch && matchYear && matchDay
+  })
+})
+
+// Year-level breakdown for reports
+const rptByYear = computed(() => {
+  const years = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+  const total  = students.value.length
+  return years.map(y => ({
+    label:     y,
+    total:     students.value.filter(s => s.yearLevel === y).length,
+    loggedIn:  attendance.value.filter(r => r.yearLevel === y).length,
+    completed: completedList.value.filter(r => r.yearLevel === y).length,
+  }))
+})
+
+// Reports active tab: 'completed' | 'loggedin'
+const rptTab = ref<'completed' | 'loggedin'>('completed')
+
+// Pagination for reports table
+const RPT_PAGE_SIZE = 15
+const rptPage       = ref(1)
+const rptList = computed(() => rptTab.value === 'completed' ? completedFiltered.value : loginList.value)
+const rptTotalPages = computed(() => Math.max(1, Math.ceil(rptList.value.length / RPT_PAGE_SIZE)))
+const rptPaginated  = computed(() => rptList.value.slice((rptPage.value - 1) * RPT_PAGE_SIZE, rptPage.value * RPT_PAGE_SIZE))
+
+function rptPrevPage() { if (rptPage.value > 1) rptPage.value-- }
+function rptNextPage() { if (rptPage.value < rptTotalPages.value) rptPage.value++ }
+
+// Export CSV for attendance reports
+function rptExportCSV() {
+  let rows: any[][]
+  if (rptTab.value === 'completed') {
+    rows = [
+      ['#', 'Student ID', 'Name', 'Year Level', 'Dept', 'Event', 'Date', 'Time In', 'Time Out', 'Day'],
+      ...completedFiltered.value.map((r, i) => [
+        i + 1, r.studentId, r.name, r.yearLevel, r.dept, r.eventName, r.date, r.timeIn, r.timeOut, r.paidDay ?? '',
+      ]),
+    ]
+  } else {
+    rows = [
+      ['#', 'Student ID', 'Name', 'Year Level', 'Dept', 'Event', 'Date', 'Time In', 'Day'],
+      ...loginList.value.map((r, i) => [
+        i + 1, r.studentId, r.name, r.yearLevel, r.dept, r.eventName, r.date, r.timeIn,
+        paidDayMap.value.get(paidDayKeyOf(r.name)) ?? '',
+      ]),
+    ]
+  }
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `attendance-report-${rptTab.value}-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 const paidFiltered = computed(() =>
@@ -2779,6 +2914,213 @@ onMounted(() => {
           </div>
           <!-- â•â• SETTINGS â•â• -->
           <!-- Settings -->
+          <!-- â•â• REPORTS â•â• -->
+          <div v-else-if="activePage === 'reports'" class="space-y-5">
+
+            <!-- Header -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.24em] text-sync-green font-semibold mb-1">Reports</p>
+                  <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Attendance Report</h1>
+                  <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Total logged in, logged out, and completed attendance.</p>
+                </div>
+                <button @click="rptExportCSV"
+                  class="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors self-start sm:self-auto font-medium">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                  </svg>
+                  Export CSV
+                </button>
+              </div>
+            </div>
+
+            <!-- Stats Dashboard -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Students</p>
+                <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ students.length }}</p>
+              </div>
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-900 p-4">
+                <p class="text-xs text-blue-500 font-medium uppercase tracking-wide">Total Logged In</p>
+                <p class="text-3xl font-bold text-blue-500 mt-1">{{ rptLoggedIn }}</p>
+              </div>
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-orange-200 dark:border-orange-900 p-4">
+                <p class="text-xs text-orange-500 font-medium uppercase tracking-wide">Total Logged Out</p>
+                <p class="text-3xl font-bold text-orange-500 mt-1">{{ rptLoggedOut }}</p>
+              </div>
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-green-200 dark:border-green-900 p-4">
+                <p class="text-xs text-sync-green font-medium uppercase tracking-wide">Completed</p>
+                <p class="text-3xl font-bold text-sync-green mt-1">{{ rptCompleted }}</p>
+                <p class="text-xs text-gray-400 mt-0.5">Logged in &amp; out</p>
+              </div>
+            </div>
+
+            <!-- Day Breakdown -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-900 p-5">
+                <div class="flex items-end justify-between mb-1">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-blue-500">1ST DAY</p>
+                    <p class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-1">{{ rpt1stDay }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">1st Day Attendees</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs text-gray-400 font-medium">LOGGED IN</p>
+                    <p class="text-2xl font-bold text-blue-500">{{ attendance.filter(r => (paidDayMap.get(paidDayKeyOf(r.name)) ?? null) === 'First Day').length }}</p>
+                    <p class="text-xs text-gray-400">{{ rpt1stDay ? Math.round(attendance.filter(r => (paidDayMap.get(paidDayKeyOf(r.name)) ?? null) === 'First Day').length / rpt1stDay * 100) : 0 }}%</p>
+                  </div>
+                </div>
+                <div class="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-1.5 mt-3">
+                  <div class="bg-blue-500 h-1.5 rounded-full transition-all"
+                    :style="`width:${rpt1stDay ? Math.round(attendance.filter(r => (paidDayMap.get(paidDayKeyOf(r.name)) ?? null) === 'First Day').length / rpt1stDay * 100) : 0}%`">
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white dark:bg-gray-900 rounded-xl border border-purple-200 dark:border-purple-900 p-5">
+                <div class="flex items-end justify-between mb-1">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-purple-500">2ND DAY</p>
+                    <p class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-1">{{ rpt2ndDay }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">2nd Day Attendees</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs text-gray-400 font-medium">LOGGED IN</p>
+                    <p class="text-2xl font-bold text-purple-500">{{ attendance.filter(r => (paidDayMap.get(paidDayKeyOf(r.name)) ?? null) === 'Second Day').length }}</p>
+                    <p class="text-xs text-gray-400">{{ rpt2ndDay ? Math.round(attendance.filter(r => (paidDayMap.get(paidDayKeyOf(r.name)) ?? null) === 'Second Day').length / rpt2ndDay * 100) : 0 }}%</p>
+                  </div>
+                </div>
+                <div class="w-full bg-purple-100 dark:bg-purple-900/30 rounded-full h-1.5 mt-3">
+                  <div class="bg-purple-500 h-1.5 rounded-full transition-all"
+                    :style="`width:${rpt2ndDay ? Math.round(attendance.filter(r => (paidDayMap.get(paidDayKeyOf(r.name)) ?? null) === 'Second Day').length / rpt2ndDay * 100) : 0}%`">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Year Level Breakdown -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+              <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200 mb-4">Attendance by Year Level</h3>
+              <div class="space-y-4">
+                <div v-for="y in rptByYear" :key="y.label">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ y.label }}</span>
+                    <div class="flex gap-4 text-xs">
+                      <span class="text-blue-500 font-semibold">{{ y.loggedIn }} logged in</span>
+                      <span class="text-sync-green font-semibold">{{ y.completed }} completed</span>
+                      <span class="text-gray-400">/ {{ y.total }}</span>
+                    </div>
+                  </div>
+                  <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 relative overflow-hidden">
+                    <div class="bg-blue-400 h-2 rounded-full transition-all absolute inset-y-0 left-0"
+                      :style="`width:${y.total ? Math.round(y.loggedIn/y.total*100) : 0}%`"></div>
+                    <div class="bg-sync-green h-2 rounded-full transition-all absolute inset-y-0 left-0"
+                      :style="`width:${y.total ? Math.round(y.completed/y.total*100) : 0}%`"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Filters + Tabs -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
+              <div class="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0">
+                <button @click="rptTab = 'completed'; rptPage = 1"
+                  :class="['px-4 py-1.5 text-xs font-semibold transition-colors', rptTab === 'completed' ? 'bg-sync-green text-white' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800']">
+                  Completed
+                </button>
+                <button @click="rptTab = 'loggedin'; rptPage = 1"
+                  :class="['px-4 py-1.5 text-xs font-semibold transition-colors border-l border-gray-200 dark:border-gray-700', rptTab === 'loggedin' ? 'bg-blue-500 text-white' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800']">
+                  Logged In
+                </button>
+              </div>
+              <div class="flex-1 relative min-w-[180px]">
+                <span class="absolute inset-y-0 left-3 flex items-center text-gray-400 pointer-events-none">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
+                </span>
+                <input v-model="rptSearch" type="text" placeholder="Search student..." class="input-search pl-9 w-full" @input="rptPage = 1" />
+              </div>
+              <select v-model="rptFilterYear" class="input-search w-36" @change="rptPage = 1">
+                <option value="">All Years</option>
+                <option value="1st Year">1st Year</option>
+                <option value="2nd Year">2nd Year</option>
+                <option value="3rd Year">3rd Year</option>
+                <option value="4th Year">4th Year</option>
+              </select>
+              <select v-model="rptFilterDay" class="input-search w-36" @change="rptPage = 1">
+                <option value="All">All Days</option>
+                <option value="First Day">1st Day</option>
+                <option value="Second Day">2nd Day</option>
+              </select>
+            </div>
+
+            <!-- Table -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div v-if="rptPaginated.length === 0" class="py-12 text-center text-gray-400 text-sm">No records found.</div>
+              <div v-else class="overflow-x-auto">
+                <table class="w-full min-w-[640px] text-sm">
+                  <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th class="px-4 py-3 text-left">#</th>
+                      <th class="px-4 py-3 text-left">Student ID</th>
+                      <th class="px-4 py-3 text-left">Name</th>
+                      <th class="px-4 py-3 text-left">Year</th>
+                      <th class="px-4 py-3 text-left">Dept</th>
+                      <th class="px-4 py-3 text-left">Event</th>
+                      <th class="px-4 py-3 text-left">Date</th>
+                      <th class="px-4 py-3 text-left">Time In</th>
+                      <th v-if="rptTab === 'completed'" class="px-4 py-3 text-left">Time Out</th>
+                      <th class="px-4 py-3 text-left">Day</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tr v-for="(r, idx) in rptPaginated" :key="idx"
+                      class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td class="px-4 py-3 text-xs text-gray-400">{{ (rptPage - 1) * RPT_PAGE_SIZE + idx + 1 }}</td>
+                      <td class="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{{ r.studentId }}</td>
+                      <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ r.name }}</td>
+                      <td class="px-4 py-3 text-xs text-gray-500">{{ r.yearLevel }}</td>
+                      <td class="px-4 py-3 text-xs text-gray-500">{{ r.dept }}</td>
+                      <td class="px-4 py-3 text-xs text-gray-500">{{ r.eventName }}</td>
+                      <td class="px-4 py-3 text-xs text-gray-500">{{ r.date }}</td>
+                      <td class="px-4 py-3 text-xs text-blue-500 font-medium">{{ r.timeIn }}</td>
+                      <td v-if="rptTab === 'completed'" class="px-4 py-3 text-xs text-orange-500 font-medium">{{ (r as any).timeOut }}</td>
+                      <td class="px-4 py-3">
+                        <span v-if="r.paidDay === 'First Day'"
+                          class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                          1st Day
+                        </span>
+                        <span v-else-if="r.paidDay === 'Second Day'"
+                          class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                          2nd Day
+                        </span>
+                        <span v-else class="text-xs text-gray-300 dark:text-gray-600">â€”</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- Pagination -->
+              <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+                <p class="text-xs text-gray-500">
+                  Showing {{ rptList.length === 0 ? 0 : (rptPage - 1) * RPT_PAGE_SIZE + 1 }}â€“{{ Math.min(rptPage * RPT_PAGE_SIZE, rptList.length) }} of {{ rptList.length }}
+                </p>
+                <div class="flex items-center gap-2">
+                  <button @click="rptPrevPage" :disabled="rptPage === 1"
+                    class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    Prev
+                  </button>
+                  <span class="text-xs text-gray-500 px-1">{{ rptPage }} / {{ rptTotalPages }}</span>
+                  <button @click="rptNextPage" :disabled="rptPage === rptTotalPages"
+                    class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    Next
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
           <div v-else-if="activePage === 'settings'" class="space-y-6">
             <div>
               <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>

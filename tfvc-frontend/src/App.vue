@@ -102,6 +102,7 @@ const navLinks = [
   { label: 'Import Students', path: '/import',    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>` },
   { label: 'Recently Paid',  path: '/recently-paid', icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>` },
   { label: 'List of Backout', path: '/backout',   icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>` },
+  { label: 'Reports',        path: '/reports',   icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>` },
 ]
 
 const settingsLink = {
