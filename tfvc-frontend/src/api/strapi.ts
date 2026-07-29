@@ -632,6 +632,9 @@ function toAttYearLevel(delegateYear: string): string {
  *   • studentId matches oldStudentId (when non-empty), OR
  *   • name matches oldName (case-insensitive)
  * Both checks run in parallel so records with mismatched IDs are still caught by name.
+ *
+ * Deduplication: if multiple att-student records match (e.g. from a previous partial sync),
+ * only the first one is updated — the rest are deleted to prevent duplicates.
  */
 export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<void> {
   const { oldStudentId, oldName, newStudentId, newName, newYearLevel } = payload
@@ -659,17 +662,26 @@ export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<vo
   const logoutsToUpdate  = attLogouts.filter(l  => matches(l.studentId,  l.name))
   const winnersToUpdate  = attWinners.filter(w  => matches(w.studentId,  w.name))
 
+  // ── Deduplicate att-students ──────────────────────────────────────────────
+  // If more than one att-student matched (e.g. from a previous partial sync that
+  // left a stale copy), update only the first and delete the rest.
+  const [primaryStudent, ...duplicateStudents] = studentsToUpdate
+
   // Fire all updates in parallel
   await Promise.all([
-    // att-students: use the short yearLevel format ("3rd Year")
-    ...studentsToUpdate.map(s =>
-      updateAttStudent(s.id, {
-        studentId: newStudentId,
-        name:      newName,
-        yearLevel: attYearLevel,
-      })
+    // Update the primary att-student record
+    ...(primaryStudent
+      ? [updateAttStudent(primaryStudent.id, {
+          studentId: newStudentId,
+          name:      newName,
+          yearLevel: attYearLevel,
+        })]
+      : []
     ),
-    // att-records, att-logouts, att-winners: also use short yearLevel
+    // Delete any duplicate att-student records
+    ...duplicateStudents.map(s => deleteAttStudent(s.id)),
+
+    // att-records, att-logouts, att-winners: update all matching (no dedup needed)
     ...recordsToUpdate.map(r =>
       fetch(`${BASE}/att-records/${r.id}`, {
         method: 'PUT', headers,
