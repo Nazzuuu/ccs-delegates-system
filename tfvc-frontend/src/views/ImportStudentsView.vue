@@ -83,6 +83,7 @@ const editName        = ref('')
 const editYear        = ref('First Year')
 const editError       = ref('')
 const editLoading     = ref(false)
+const editSyncMsg     = ref('')   // shows "Syncing to attendance…" / "Synced ✓" / warning
 
 function openEdit(d: { id: number; studentId: string; name: string; yearLevel: string }) {
   editId.value        = d.id
@@ -90,6 +91,7 @@ function openEdit(d: { id: number; studentId: string; name: string; yearLevel: s
   editName.value      = d.name
   editYear.value      = d.yearLevel
   editError.value     = ''
+  editSyncMsg.value   = ''
   showEditModal.value = true
 }
 
@@ -97,11 +99,23 @@ async function handleEditSave() {
   if (!editName.value.trim()) { editError.value = 'Name is required.'; return }
   if (editId.value === null) return
   editLoading.value = true
+  editSyncMsg.value  = ''
+  editError.value    = ''
   try {
+    editSyncMsg.value = 'Saving & syncing to attendance…'
     await editDelegate(editId.value, editStudentId.value.trim(), editName.value.trim().toUpperCase(), editYear.value)
+    editSyncMsg.value   = ''
     showEditModal.value = false
   } catch (e: any) {
-    editError.value = e.message ?? 'Failed to save.'
+    // If the delegate itself saved but sync failed, editDelegate now re-throws.
+    // We show it as a warning (not a blocker) since the delegate data is already saved.
+    const msg = e.message ?? 'Failed to save.'
+    if (msg.includes('sync') || msg.includes('att-')) {
+      editSyncMsg.value = '⚠ Saved, but attendance sync failed. Try editing again.'
+      showEditModal.value = false
+    } else {
+      editError.value = msg
+    }
   } finally {
     editLoading.value = false
   }
@@ -525,13 +539,18 @@ const previewInvalid = computed(() => importRows.value.filter(r => r.yearLevel =
                 <option v-for="y in yearLevels.filter(y=>y!=='All')" :key="y" :value="y">{{ shortYear(y) }}</option>
               </select>
             </div>
+            <!-- Sync status -->
+            <p v-if="editSyncMsg" class="text-xs text-blue-500 dark:text-blue-400 flex items-center gap-1.5">
+              <svg v-if="editLoading" class="animate-spin w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+              {{ editSyncMsg }}
+            </p>
           </div>
           <div class="flex gap-3 mt-5">
-            <button @click="showEditModal=false" class="btn-secondary flex-1">Cancel</button>
+            <button @click="showEditModal=false" :disabled="editLoading" class="btn-secondary flex-1 disabled:opacity-50">Cancel</button>
             <button @click="handleEditSave" :disabled="editLoading" class="btn-primary flex-1 inline-flex items-center justify-center gap-2 disabled:opacity-60">
               <svg v-if="editLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
               <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-              Save
+              {{ editLoading ? 'Saving…' : 'Save' }}
             </button>
           </div>
         </div>

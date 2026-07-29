@@ -606,7 +606,21 @@ export interface DelegateSyncPayload {
   oldName: string
   newStudentId: string
   newName: string
-  newYearLevel: string
+  newYearLevel: string  // delegates format: "Third Year"
+}
+
+/**
+ * Convert delegates yearLevel ("First Year" / "Second Year" / etc.)
+ * to the short form used by the attendance system ("1st Year" / "2nd Year" / etc.)
+ */
+function toAttYearLevel(delegateYear: string): string {
+  const map: Record<string, string> = {
+    'First Year':  '1st Year',
+    'Second Year': '2nd Year',
+    'Third Year':  '3rd Year',
+    'Fourth Year': '4th Year',
+  }
+  return map[delegateYear] ?? delegateYear
 }
 
 /**
@@ -614,16 +628,22 @@ export interface DelegateSyncPayload {
  * propagate those changes to ALL tables in the attendance system that store
  * denormalized student info: att-students, att-records, att-logouts, att-winners.
  *
- * Matching strategy (in priority order):
- *   1. If oldStudentId is non-empty → match by studentId
- *   2. Otherwise → match by name (case-insensitive)
+ * Matching strategy — a record matches if:
+ *   • studentId matches oldStudentId (when non-empty), OR
+ *   • name matches oldName (case-insensitive)
+ * Both checks run in parallel so records with mismatched IDs are still caught by name.
  */
 export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<void> {
   const { oldStudentId, oldName, newStudentId, newName, newYearLevel } = payload
 
-  const matchById   = (id: string) => oldStudentId ? id === oldStudentId : false
-  const matchByName = (n: string)  => n.toLowerCase().trim() === oldName.toLowerCase().trim()
-  const matches     = (id: string, n: string) => matchById(id) || matchByName(n)
+  // Convert yearLevel to the short form the attendance system stores
+  const attYearLevel = toAttYearLevel(newYearLevel)
+
+  function matches(id: string, n: string): boolean {
+    const byId   = oldStudentId.trim() !== '' && id.trim() === oldStudentId.trim()
+    const byName = n.toLowerCase().trim() === oldName.toLowerCase().trim()
+    return byId || byName
+  }
 
   // Run all four collection fetches in parallel
   const [attStudents, attRecords, attLogouts, attWinners] = await Promise.all([
@@ -633,36 +653,39 @@ export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<vo
     fetchAttWinners(),
   ])
 
-  // ── att-students ──
+  // Filter matching records per collection
   const studentsToUpdate = attStudents.filter(s => matches(s.studentId, s.name))
-  // ── att-records ──
   const recordsToUpdate  = attRecords.filter(r  => matches(r.studentId,  r.name))
-  // ── att-logouts ──
   const logoutsToUpdate  = attLogouts.filter(l  => matches(l.studentId,  l.name))
-  // ── att-winners ──
   const winnersToUpdate  = attWinners.filter(w  => matches(w.studentId,  w.name))
 
-  // Fire all updates in parallel (batched per collection)
+  // Fire all updates in parallel
   await Promise.all([
+    // att-students: use the short yearLevel format ("3rd Year")
     ...studentsToUpdate.map(s =>
-      updateAttStudent(s.id, { studentId: newStudentId, name: newName, yearLevel: newYearLevel })
+      updateAttStudent(s.id, {
+        studentId: newStudentId,
+        name:      newName,
+        yearLevel: attYearLevel,
+      })
     ),
+    // att-records, att-logouts, att-winners: also use short yearLevel
     ...recordsToUpdate.map(r =>
       fetch(`${BASE}/att-records/${r.id}`, {
         method: 'PUT', headers,
-        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: newYearLevel } }),
+        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: attYearLevel } }),
       })
     ),
     ...logoutsToUpdate.map(l =>
       fetch(`${BASE}/att-logouts/${l.id}`, {
         method: 'PUT', headers,
-        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: newYearLevel } }),
+        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: attYearLevel } }),
       })
     ),
     ...winnersToUpdate.map(w =>
       fetch(`${BASE}/att-winners/${w.id}`, {
         method: 'PUT', headers,
-        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: newYearLevel } }),
+        body: JSON.stringify({ data: { studentId: newStudentId, name: newName, yearLevel: attYearLevel } }),
       })
     ),
   ])

@@ -155,15 +155,14 @@ export function useDelegates() {
     d.name      = name
     d.yearLevel = yearLevel
 
-    // 2. Silently propagate to attendance system (non-blocking — errors don't fail the edit)
-    syncDelegateEdit({
+    // 2. Propagate to attendance system — awaited so the caller knows when sync completes.
+    //    Errors are re-thrown so the UI can surface a warning.
+    await syncDelegateEdit({
       oldStudentId,
       oldName,
       newStudentId: studentId,
       newName: name,
       newYearLevel: yearLevel,
-    }).catch(() => {
-      // Attendance sync failure is non-critical; the delegate edit itself succeeded.
     })
   }
 
