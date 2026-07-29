@@ -31,7 +31,7 @@ function endOfDay(date: Date): Date {
   return d
 }
 
-function isInPeriod(isoString: string | null): boolean {
+function isInPeriod(isoString: string | null | undefined): boolean {
   if (!isoString) return false
   const paidDate = new Date(isoString)
   const now      = new Date()
@@ -87,7 +87,7 @@ function prevPage() { if (currentPage.value > 1) currentPage.value-- }
 function nextPage() { if (currentPage.value < totalPages.value) currentPage.value++ }
 
 // ── Format time helper ─────────────────────────────────────────────────────
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('en-PH', {
     hour: '2-digit',
@@ -96,7 +96,7 @@ function formatTime(iso: string | null): string {
   })
 }
 
-function formatDate(iso: string | null): string {
+function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-PH', {
     month: 'short',

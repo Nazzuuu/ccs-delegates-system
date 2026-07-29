@@ -18,11 +18,14 @@ export interface StrapiDelegate {
   status: 'Paid' | 'Not Paid' | 'Backout'
   isPaid: boolean
   isReceived: boolean
-  paidAt: string | null  // ISO datetime string set when delegate is marked Paid
-  updatedAt: string | null // Strapi auto-managed timestamp
+  paidAt?: string | null    // ISO datetime string set when delegate is marked Paid
+  updatedAt?: string | null // Strapi auto-managed timestamp
 }
 
 function mapEntry(d: any): StrapiDelegate {
+  // For Paid delegates that pre-date the paidAt field, fall back to updatedAt
+  // so they still appear in Recently Paid when relevant.
+  const paidAt = d.paidAt ?? (d.status === 'Paid' ? (d.updatedAt ?? null) : null)
   return {
     id: d.id,
     documentId: d.documentId,
@@ -32,7 +35,7 @@ function mapEntry(d: any): StrapiDelegate {
     status: d.status,
     isPaid: d.isPaid,
     isReceived: d.isReceived ?? false,
-    paidAt: d.paidAt ?? null,
+    paidAt,
     updatedAt: d.updatedAt ?? null,
   }
 }
