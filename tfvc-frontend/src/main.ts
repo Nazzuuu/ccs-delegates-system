@@ -13,6 +13,7 @@ import ImportStudentsView from './views/ImportStudentsView.vue'
 import BackoutListView  from './views/BackoutListView.vue'
 import SettingsView     from './views/SettingsView.vue'
 import AttendanceView   from './views/AttendanceView.vue'
+import PaidView         from './views/PaidView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -25,6 +26,7 @@ const router = createRouter({
     { path: '/received',  component: ReceivedView,        name: 'received' },
     { path: '/import',    component: ImportStudentsView,  name: 'import' },
     { path: '/backout',   component: BackoutListView,     name: 'backout' },
+    { path: '/paid',      component: PaidView,            name: 'paid' },
     { path: '/settings',  component: SettingsView,        name: 'settings' },
   ]
 })

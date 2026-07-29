@@ -1614,7 +1614,7 @@ onMounted(() => {
                   <div>
                     <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">1st Day</p>
                     <p class="text-4xl font-bold text-sky-600 dark:text-sky-400">{{ dashTotalFirstDay }}</p>
-                    <p class="text-xs text-gray-400 mt-1">registered students</p>
+                    <p class="text-xs text-gray-400 mt-1">1ST DAY ATTENDEES</p>
                   </div>
                   <div class="text-right flex-shrink-0">
                     <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Logged In</p>
@@ -1638,7 +1638,7 @@ onMounted(() => {
                   <div>
                     <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">2nd Day</p>
                     <p class="text-4xl font-bold text-violet-600 dark:text-violet-400">{{ dashTotalSecondDay }}</p>
-                    <p class="text-xs text-gray-400 mt-1">registered students</p>
+                    <p class="text-xs text-gray-400 mt-1">2ND DAY ATTENDEES</p>
                   </div>
                   <div class="text-right flex-shrink-0">
                     <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Logged In</p>
