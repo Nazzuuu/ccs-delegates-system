@@ -1496,13 +1496,25 @@ const completedFiltered = computed(() => {
 // Also build a simple loginOnly list for the full logged-in table
 const loginList = computed(() => {
   const q = rptSearch.value.toLowerCase()
-  return attendance.value.filter(r => {
-    const matchSearch = !q || r.studentId.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
-    const matchYear   = !rptFilterYear.value || r.yearLevel.toLowerCase().trim() === rptFilterYear.value.toLowerCase().trim()
-    const matchDay    = rptFilterDay.value === 'All' ||
-      (paidDayMap.value.get(paidDayKeyOf(r.name)) ?? null) === rptFilterDay.value
-    return matchSearch && matchYear && matchDay
-  })
+  return attendance.value
+    .filter(r => {
+      const matchSearch = !q || r.studentId.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+      const matchYear   = !rptFilterYear.value || r.yearLevel.toLowerCase().trim() === rptFilterYear.value.toLowerCase().trim()
+      const matchDay    = rptFilterDay.value === 'All' ||
+        (paidDayMap.value.get(paidDayKeyOf(r.name)) ?? null) === rptFilterDay.value
+      return matchSearch && matchYear && matchDay
+    })
+    .map(r => ({
+      studentId: r.studentId,
+      name:      r.name,
+      yearLevel: r.yearLevel,
+      dept:      r.dept,
+      eventName: r.eventName,
+      date:      r.date,
+      timeIn:    r.timeIn,
+      timeOut:   null as string | null,
+      paidDay:   paidDayMap.value.get(paidDayKeyOf(r.name)) ?? null as 'First Day' | 'Second Day' | null,
+    }))
 })
 
 // Year-level breakdown for reports
@@ -3083,7 +3095,7 @@ onMounted(() => {
                       <td class="px-4 py-3 text-xs text-gray-500">{{ r.eventName }}</td>
                       <td class="px-4 py-3 text-xs text-gray-500">{{ r.date }}</td>
                       <td class="px-4 py-3 text-xs text-blue-500 font-medium">{{ r.timeIn }}</td>
-                      <td v-if="rptTab === 'completed'" class="px-4 py-3 text-xs text-orange-500 font-medium">{{ (r as any).timeOut }}</td>
+                      <td v-if="rptTab === 'completed'" class="px-4 py-3 text-xs text-orange-500 font-medium">{{ r.timeOut }}</td>
                       <td class="px-4 py-3">
                         <span v-if="r.paidDay === 'First Day'"
                           class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
