@@ -73,9 +73,11 @@ export function useDelegates() {
   async function markPaid(id: number) {
     const d = delegates.value.find(x => x.id === id)
     if (!d) return
+    const now = new Date().toISOString()
     d.status = 'Paid'
     d.isPaid = true
-    await updateDelegate(d.documentId, { status: 'Paid', isPaid: true })
+    d.paidAt = now
+    await updateDelegate(d.documentId, { status: 'Paid', isPaid: true, paidAt: now })
   }
 
   async function markUnpaid(id: number) {

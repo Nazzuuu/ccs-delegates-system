@@ -18,6 +18,8 @@ export interface StrapiDelegate {
   status: 'Paid' | 'Not Paid' | 'Backout'
   isPaid: boolean
   isReceived: boolean
+  paidAt: string | null  // ISO datetime string set when delegate is marked Paid
+  updatedAt: string | null // Strapi auto-managed timestamp
 }
 
 function mapEntry(d: any): StrapiDelegate {
@@ -30,6 +32,8 @@ function mapEntry(d: any): StrapiDelegate {
     status: d.status,
     isPaid: d.isPaid,
     isReceived: d.isReceived ?? false,
+    paidAt: d.paidAt ?? null,
+    updatedAt: d.updatedAt ?? null,
   }
 }
 
@@ -57,7 +61,7 @@ export async function fetchAllDelegates(): Promise<StrapiDelegate[]> {
 /** Update a delegate using its documentId (Strapi v5). */
 export async function updateDelegate(
   documentId: string,
-  data: Partial<Pick<StrapiDelegate, 'status' | 'isPaid' | 'isReceived' | 'name' | 'yearLevel' | 'studentId'>>
+  data: Partial<Pick<StrapiDelegate, 'status' | 'isPaid' | 'isReceived' | 'name' | 'yearLevel' | 'studentId' | 'paidAt'>>
 ): Promise<void> {
   const res = await fetch(`${BASE}/delegates/${documentId}`, {
     method: 'PUT',

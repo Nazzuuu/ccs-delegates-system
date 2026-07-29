@@ -16,6 +16,9 @@
             "type": "string",
             "required": true
         },
+        "studentId": {
+            "type": "string"
+        },
         "yearLevel": {
             "type": "enumeration",
             "enum": [
@@ -45,6 +48,9 @@
             "type": "boolean",
             "default": false,
             "required": true
+        },
+        "paidAt": {
+            "type": "datetime"
         }
     }
 }
