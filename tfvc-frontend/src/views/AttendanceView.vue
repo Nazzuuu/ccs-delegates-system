@@ -163,7 +163,7 @@ const winners    = ref<Winner[]>([])
 const settings   = ref<AppSettings>({ acadYear: '2025-2026', dept: 'College of Computer Studies', allowDuplicate: false, raffleAttendeeOnly: true, activeEventId: '', loginMode: 'login' })
 
 function focusScanInput() {
-  if (activePage.value !== 'attendance') return
+  if (activePage.value !== 'attendance' || attTab.value !== 'scan') return
   nextTick(() => scanInputEl.value?.focus())
 }
 
@@ -1888,7 +1888,7 @@ onMounted(() => {
 
             <!-- Tabs -->
             <div class="flex gap-1 border-b border-gray-200 dark:border-gray-700">
-              <button @click="attTab='scan'" :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors', attTab==='scan' ? 'border-sync-green text-sync-green' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']">Scan / Log</button>
+              <button @click="attTab='scan'; focusScanInput()" :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors', attTab==='scan' ? 'border-sync-green text-sync-green' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']">Scan / Log</button>
               <button @click="attTab='records'" :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors', attTab==='records' ? 'border-sync-green text-sync-green' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']">Records</button>
             </div>
 
@@ -1960,7 +1960,7 @@ onMounted(() => {
                     ]"
                     @keyup.enter="logAttendance"
                     @input="handleScanInput"
-                    @blur="focusScanInput"
+                    @blur="(e) => { const rt = (e as FocusEvent).relatedTarget as HTMLElement | null; if (!rt || !['button','a'].includes(rt.tagName.toLowerCase())) focusScanInput() }"
                     :disabled="!attEventId" />
                   <div class="flex items-center justify-between mt-3">
                     <div class="flex items-center gap-2 text-xs" :class="attEventId ? 'text-gray-500' : 'text-orange-500 font-medium'">
