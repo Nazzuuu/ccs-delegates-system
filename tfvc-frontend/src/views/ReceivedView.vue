@@ -5,7 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const { delegates, loading, error, searchQuery, filterYear, yearLevels, shortYear, markReceived, markNotReceived, loadDelegates } = useDelegates()
 
-onMounted(() => loadDelegates())
+onMounted(() => loadDelegates(true))
 
 const filterReceived = ref<'All' | 'Received' | 'Not Received'>('All')
 const PAGE_SIZE = 10

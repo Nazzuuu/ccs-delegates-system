@@ -5,15 +5,25 @@ import { logout, isSuperAdmin, currentUser } from './composables/useAuth'
 import { loadDelegates } from './composables/useDelegates'
 
 // ── Auto-refresh ───────────────────────────────────────────────────────────
-const autoRefresh = ref(false)
+const autoRefresh = ref(true)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
+function startAutoRefresh() {
+  if (refreshTimer) return
+  autoRefresh.value = true
+  refreshTimer = setInterval(() => loadDelegates(true, true), 5000)
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
+  autoRefresh.value = false
+}
+
 function toggleAutoRefresh() {
-  autoRefresh.value = !autoRefresh.value
   if (autoRefresh.value) {
-    refreshTimer = setInterval(() => loadDelegates(true, true), 1000)
+    stopAutoRefresh()
   } else {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
+    startAutoRefresh()
   }
 }
 
@@ -43,10 +53,13 @@ onMounted(() => {
   if (!isMobile.value && saved !== null) {
     sidebarOpen.value = saved === 'true'
   }
+
+  // Auto-refresh always starts on mount so edits by other users are visible immediately
+  startAutoRefresh()
 })
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
-  if (refreshTimer) clearInterval(refreshTimer)
+  stopAutoRefresh()
 })
 
 function toggleSidebar() {

@@ -4,7 +4,7 @@ import { useDelegates } from '../composables/useDelegates'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const { loading, error, yearLevels, shortYear, backoutList, markUnpaid, loadDelegates } = useDelegates()
-onMounted(() => loadDelegates())
+onMounted(() => loadDelegates(true))
 
 const searchQuery = ref('')
 const filterYear  = ref('All')

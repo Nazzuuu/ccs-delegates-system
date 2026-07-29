@@ -5,7 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const { delegates, filtered, loading, error, searchQuery, filterStatus, filterYear, yearLevels, shortYear, markPaid, markUnpaid, markBackout, loadDelegates } = useDelegates()
 
-onMounted(() => loadDelegates())
+onMounted(() => loadDelegates(true))  // force=true ensures fresh data from Strapi on every mount
 
 const PAGE_SIZE = 10
 const currentPage = ref(1)

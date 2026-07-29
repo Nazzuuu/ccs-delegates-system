@@ -4,7 +4,7 @@ import { useDelegates } from '../composables/useDelegates'
 
 const { delegates, filtered, loading, error, searchQuery, filterStatus, filterYear, yearLevels, shortYear, loadDelegates } = useDelegates()
 
-onMounted(() => loadDelegates())
+onMounted(() => loadDelegates(true))
 
 const PAGE_SIZE = 10
 const currentPage = ref(1)

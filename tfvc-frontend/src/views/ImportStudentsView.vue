@@ -7,7 +7,7 @@ import { importDelegates, type ImportRow } from '../api/strapi'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const { delegates, loading, error, addDelegate, removeDelegate, editDelegate, yearLevels, shortYear, loadDelegates } = useDelegates()
-onMounted(() => loadDelegates())
+onMounted(() => loadDelegates(true))
 
 const searchQuery = ref('')
 const PAGE_SIZE   = 10

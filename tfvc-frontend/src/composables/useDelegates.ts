@@ -18,7 +18,7 @@ let loaded = false
 
 /** Load all delegates from Strapi. Skips if already loaded; pass force=true to reload. Pass silent=true to skip loading spinner (for auto-refresh). */
 export async function loadDelegates(force = false, silent = false) {
-  if (loaded && !force) return
+  if (loaded && !force && !silent) return  // silent calls always bypass cache to show fresh data
   if (!silent) loading.value = true
   error.value = null
   try {
