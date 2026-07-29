@@ -66,13 +66,129 @@ async function handleConfirm() {
     pendingId.value      = null
   }
 }
+
+// ── Generate Barcodes ─────────────────────────────────────────────────────
+function generateBarcodes() {
+  // Use all non-backout delegates with a valid studentId, sorted by name
+  const list = delegates.value
+    .filter(d => d.status !== 'Backout' && d.studentId)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  if (!list.length) {
+    alert('No delegates with Student IDs found.')
+    return
+  }
+
+  const win = window.open('', '_blank', 'width=1000,height=750')
+  if (!win) { alert('Please allow popups for this site.'); return }
+
+  const cards = list.map(d => `
+    <div class="card">
+      <svg class="barcode" id="bc-${d.id}"></svg>
+      <div class="name">${d.name}</div>
+      <div class="meta">${shortYear(d.yearLevel)}</div>
+    </div>
+  `).join('')
+
+  const barcodeInits = list.map(d => `
+    JsBarcode("#bc-${d.id}", "${d.studentId}", {
+      format: "CODE128",
+      width: 2,
+      height: 60,
+      displayValue: true,
+      fontSize: 14,
+      margin: 6,
+      background: "transparent"
+    });
+  `).join('')
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Barcodes</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 16px; }
+    .toolbar {
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; padding: 10px 16px;
+      border-bottom: 1px solid #e5e7eb; margin-bottom: 16px;
+      border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .btn-print {
+      background: #3b82f6; color: #fff; border: none; padding: 8px 20px;
+      border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;
+      display: flex; align-items: center; gap-6px; gap: 6px;
+    }
+    .btn-print:hover { background: #2563eb; }
+    .btn-close {
+      background: #e5e7eb; color: #374151; border: none; padding: 8px 16px;
+      border-radius: 6px; cursor: pointer; font-size: 14px;
+    }
+    .btn-close:hover { background: #d1d5db; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px 8px 10px; text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .barcode { width: 100%; max-width: 180px; }
+    .name {
+      font-size: 11px; font-weight: 700; color: #1e40af;
+      margin-top: 6px; text-transform: uppercase; letter-spacing: 0.02em;
+      word-break: break-word; line-height: 1.3;
+    }
+    .meta { font-size: 10px; color: #6b7280; margin-top: 2px; }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .toolbar { display: none; }
+      .grid { gap: 8px; }
+      .card { box-shadow: none; border-color: #ddd; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="btn-print" onclick="window.print()">&#x1F5A8; Print Barcodes</button>
+    <button class="btn-close" onclick="window.close()">Close</button>
+    <span style="color:#6b7280;font-size:13px;margin-left:auto;">${list.length} students</span>
+  </div>
+  <div class="grid">${cards}</div>
+  <script>
+    window.onload = function() {
+      ${barcodeInits}
+    };
+  <\/script>
+</body>
+</html>`)
+  win.document.close()
+}
 </script>
 
 <template>
   <div class="p-3 sm:p-6">
-    <div class="mb-4 sm:mb-6">
-      <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Students</h2>
-      <p class="text-gray-500 text-sm mt-1">CCS Delegates — Payment Management</p>
+    <div class="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Students</h2>
+        <p class="text-gray-500 text-sm mt-1">CCS Delegates — Payment Management</p>
+      </div>
+      <button @click="generateBarcodes" class="btn-secondary inline-flex items-center gap-2 text-sm px-4 py-2 self-start sm:self-auto">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m0 14v1M4 12h1m14 0h1M5.636 5.636l.707.707m11.314 11.314l.707.707M5.636 18.364l.707-.707m11.314-11.314l.707-.707"/>
+          <rect x="3" y="3" width="5" height="5" rx="0.5"/>
+          <rect x="16" y="3" width="5" height="5" rx="0.5"/>
+          <rect x="3" y="16" width="5" height="5" rx="0.5"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16 16h2v2h-2zm2-2h2v2h-2z"/>
+        </svg>
+        Generate Barcodes
+      </button>
     </div>
 
     <div v-if="error" class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg px-4 py-3 text-sm flex items-center gap-2">

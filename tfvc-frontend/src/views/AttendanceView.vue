@@ -552,6 +552,110 @@ function studentNextPage() {
   if (currentStudentPage.value < studentPageCount.value) currentStudentPage.value++
 }
 
+// ── Generate Barcodes ─────────────────────────────────────────────────────
+function generateBarcodes() {
+  // Use all students with a valid studentId, sorted by name
+  const list = students.value
+    .filter(s => s.studentId)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  if (!list.length) {
+    alert('No students with Student IDs found.')
+    return
+  }
+
+  const win = window.open('', '_blank', 'width=1000,height=750')
+  if (!win) { alert('Please allow popups for this site.'); return }
+
+  const cards = list.map((s, i) => `
+    <div class="card">
+      <svg class="barcode" id="bc-${i}"></svg>
+      <div class="name">${s.name}</div>
+      <div class="meta">${s.dept}</div>
+    </div>
+  `).join('')
+
+  const barcodeInits = list.map((s, i) => `
+    JsBarcode("#bc-${i}", "${s.studentId}", {
+      format: "CODE128",
+      width: 2,
+      height: 60,
+      displayValue: true,
+      fontSize: 14,
+      margin: 6,
+      background: "transparent"
+    });
+  `).join('')
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Barcodes</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 16px; }
+    .toolbar {
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; padding: 10px 16px;
+      border-bottom: 1px solid #e5e7eb; margin-bottom: 16px;
+      border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .btn-print {
+      background: #3b82f6; color: #fff; border: none; padding: 8px 20px;
+      border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-print:hover { background: #2563eb; }
+    .btn-close {
+      background: #e5e7eb; color: #374151; border: none; padding: 8px 16px;
+      border-radius: 6px; cursor: pointer; font-size: 14px;
+    }
+    .btn-close:hover { background: #d1d5db; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px 8px 10px; text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .barcode { width: 100%; max-width: 180px; }
+    .name {
+      font-size: 11px; font-weight: 700; color: #1e40af;
+      margin-top: 6px; text-transform: uppercase; letter-spacing: 0.02em;
+      word-break: break-word; line-height: 1.3;
+    }
+    .meta { font-size: 10px; color: #6b7280; margin-top: 2px; }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .toolbar { display: none; }
+      .grid { gap: 8px; }
+      .card { box-shadow: none; border-color: #ddd; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="btn-print" onclick="window.print()">&#x1F5A8; Print Barcodes</button>
+    <button class="btn-close" onclick="window.close()">Close</button>
+    <span style="color:#6b7280;font-size:13px;margin-left:auto;">${list.length} students</span>
+  </div>
+  <div class="grid">${cards}</div>
+  <script>
+    window.onload = function() {
+      ${barcodeInits}
+    };
+  <\/script>
+</body>
+</html>`)
+  win.document.close()
+}
+
 function openAddStudent() { editStuId.value = null; stuForm.value = { studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' }; showStuModal.value = true }
 function openEditStudent(s: Student) { editStuId.value = s.id; stuForm.value = { studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }; showStuModal.value = true }
 function openImportDialog() { showImportModal.value = true }
@@ -1960,6 +2064,12 @@ onMounted(() => {
               <button @click="openImportDialog" class="btn-secondary flex items-center gap-2 text-sm">
                 <span class="w-6 h-6 rounded-full bg-sync-green/10 text-sync-green flex items-center justify-center text-base font-bold">+</span>
                 Import CSV
+              </button>
+              <button @click="generateBarcodes" class="btn-secondary flex items-center gap-2 text-sm">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h3v3H3zM3 10.5h3v3H3zM3 17h3v3H3zM8 4h2v2H8zM8 7h2v1H8zM11 4h1v3h-1zM13 4h1v3h-1zM10 10.5h1v3h-1zM12 10.5h3v1h-3zM15 12h1v1.5h-1zM8 17h2v1H8zM11 17h1v1H11zM13 17h3v3h-3zM8 19h2v1H8z"/>
+                </svg>
+                Generate Barcodes
               </button>
               <button @click="openAddStudent" class="btn-primary flex items-center gap-2 text-sm w-full sm:w-auto justify-center">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
