@@ -1487,12 +1487,17 @@ const rptCompleted = computed(() => {
   ).length
 })
 
-// 1st Day vs 2nd Day counts (from att-students paidDay field + paidDayMap)
+// 1st Day vs 2nd Day counts — use paidRows (same source as dashboard) when available,
+// fall back to students.value (att-students paidDay) before first Pull.
 const rpt1stDay = computed(() =>
-  students.value.filter(s => paidDayMap.value.get(paidDayKeyOf(s.name)) === 'First Day').length
+  paidRows.value.length > 0
+    ? paidRows.value.filter(r => r.status === 'First Day').length
+    : students.value.filter(s => paidDayMap.value.get(paidDayKeyOf(s.name)) === 'First Day').length
 )
 const rpt2ndDay = computed(() =>
-  students.value.filter(s => paidDayMap.value.get(paidDayKeyOf(s.name)) === 'Second Day').length
+  paidRows.value.length > 0
+    ? paidRows.value.filter(r => r.status === 'Second Day').length
+    : students.value.filter(s => paidDayMap.value.get(paidDayKeyOf(s.name)) === 'Second Day').length
 )
 
 // Detailed completed list: students who logged in AND logged out
@@ -1562,10 +1567,19 @@ const loginList = computed(() => {
 // Year-level breakdown for reports
 const rptByYear = computed(() => {
   const years = ['1st Year', '2nd Year', '3rd Year', '4th Year']
-  const total  = students.value.length
+  // Use paidRows when available — convert year level format to short form for matching
+  const yearSource = paidRows.value.length > 0
+    ? paidRows.value.map(r => ({
+        yearLevel: r.yearLevel
+          .replace('First Year', '1st Year')
+          .replace('Second Year', '2nd Year')
+          .replace('Third Year', '3rd Year')
+          .replace('Fourth Year', '4th Year'),
+      }))
+    : students.value
   return years.map(y => ({
     label:     y,
-    total:     students.value.filter(s => s.yearLevel === y).length,
+    total:     yearSource.filter(s => s.yearLevel === y).length,
     loggedIn:  attendance.value.filter(r => r.yearLevel === y).length,
     completed: completedList.value.filter(r => r.yearLevel === y).length,
   }))
@@ -3055,7 +3069,7 @@ onMounted(() => {
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
                 <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Students</p>
-                <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ students.length }}</p>
+                <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ dashTotalStudents }}</p>
               </div>
               <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-900 p-4">
                 <p class="text-xs text-blue-500 font-medium uppercase tracking-wide">Total Logged In</p>
