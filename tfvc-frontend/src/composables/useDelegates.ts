@@ -5,6 +5,7 @@ import {
   createDelegate,
   deleteDelegate,
   syncDelegateEdit,
+  syncDelegateDelete,
   type StrapiDelegate,
 } from '../api/strapi'
 
@@ -133,7 +134,11 @@ export function useDelegates() {
   async function removeDelegate(id: number) {
     const d = delegates.value.find(x => x.id === id)
     if (!d) return
+    // 1. Delete from CCS delegates system
     await deleteDelegate(d.documentId)
+    // 2. Cascade delete from attendance system (att-student + att-records + att-logouts + att-winners)
+    await syncDelegateDelete({ studentId: d.studentId ?? '', name: d.name })
+    // 3. Remove from local state
     const idx = delegates.value.findIndex(x => x.id === id)
     if (idx !== -1) delegates.value.splice(idx, 1)
   }

@@ -600,6 +600,58 @@ export async function saveAttSetting(data: AttSetting): Promise<void> {
   if (!res.ok) throw new Error(`saveAttSetting failed: ${res.status}`)
 }
 
+// ── Cross-system sync: delegate DELETE → attendance system ────────────────────
+
+export interface DelegateDeletePayload {
+  studentId: string   // the CCS delegate studentId
+  name: string        // the CCS delegate name
+}
+
+/**
+ * When a delegate is deleted from the CCS system, cascade-delete all matching
+ * records in the attendance system:
+ *   - att-students (the student entry itself)
+ *   - att-records  (login / attendance records)
+ *   - att-logouts  (logout records)
+ *   - att-winners  (raffle winner records)
+ *
+ * Matching strategy: a record matches if
+ *   • studentId matches (when non-empty), OR
+ *   • name matches (case-insensitive)
+ */
+export async function syncDelegateDelete(payload: DelegateDeletePayload): Promise<void> {
+  const { studentId, name } = payload
+
+  function matches(id: string, n: string): boolean {
+    const byId   = studentId.trim() !== '' && id.trim() === studentId.trim()
+    const byName = n.toLowerCase().trim() === name.toLowerCase().trim()
+    return byId || byName
+  }
+
+  // Fetch all four collections in parallel
+  const [attStudents, attRecords, attLogouts, attWinners] = await Promise.all([
+    fetchAttStudents(),
+    fetchAttRecords(),
+    fetchAttLogouts(),
+    fetchAttWinners(),
+  ])
+
+  const studentsToDelete = attStudents.filter(s => matches(s.studentId, s.name))
+  const recordsToDelete  = attRecords.filter(r  => matches(r.studentId,  r.name))
+  const logoutsToDelete  = attLogouts.filter(l  => matches(l.studentId,  l.name))
+  const winnersToDelete  = attWinners.filter(w  => matches(w.studentId,  w.name))
+
+  // Delete everything in parallel
+  await Promise.all([
+    ...studentsToDelete.map(s => deleteAttStudent(s.id)),
+    ...recordsToDelete.map(r  => deleteAttRecord(r.id)),
+    ...logoutsToDelete.map(l  =>
+      fetch(`${BASE}/att-logouts/${l.id}`, { method: 'DELETE', headers })
+    ),
+    ...winnersToDelete.map(w  => deleteAttWinner(w.id)),
+  ])
+}
+
 // ── Cross-system sync: delegate edit → attendance system ──────────────────────
 export interface DelegateSyncPayload {
   oldStudentId: string
