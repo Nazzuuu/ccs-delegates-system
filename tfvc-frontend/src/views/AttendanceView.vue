@@ -325,16 +325,20 @@ const recentAtt    = computed(() => [...attendance.value].reverse().slice(0, 5))
 const activeEventAttendance = computed(() =>
   attendance.value.filter(a => a.eventId === (settings.value.activeEventId || ''))
 )
-const dashTotalStudents  = computed(() => {
-  // Deduplicate: count only unique studentIds (or unique names if studentId missing)
-  // This prevents duplicates in att-students from inflating the Total Students count.
+
+// ── Deduplicated student list (single source of truth for all dashboard stats) ──
+// Removes duplicates by studentId (or name if no studentId), keeping first occurrence.
+const uniqueStudents = computed(() => {
   const seen = new Set<string>()
-  for (const s of students.value) {
+  return students.value.filter(s => {
     const key = s.studentId?.trim() ? s.studentId.trim() : s.name.toUpperCase().trim()
+    if (seen.has(key)) return false
     seen.add(key)
-  }
-  return seen.size
+    return true
+  })
 })
+
+const dashTotalStudents  = computed(() => uniqueStudents.value.length)
 const dashTotalLogins    = computed(() => {
   // unique students currently logged in for the active event today
   const s = new Set(activeEventAttendance.value.filter(a => a.date === nowDate()).map(a => a.studentId))
@@ -354,19 +358,19 @@ const dashTotalCompleted = computed(() => {
 })
 
 // ── 1st Day / 2nd Day stats ─────────────────────────────────────────────────
-// Based on att-students[].paidDay field
-const dashTotalFirstDay  = computed(() => students.value.filter(s => s.paidDay === 'First Day').length)
-const dashTotalSecondDay = computed(() => students.value.filter(s => s.paidDay === 'Second Day').length)
+// Based on att-students[].paidDay field — use uniqueStudents to avoid double-counting
+const dashTotalFirstDay  = computed(() => uniqueStudents.value.filter(s => s.paidDay === 'First Day').length)
+const dashTotalSecondDay = computed(() => uniqueStudents.value.filter(s => s.paidDay === 'Second Day').length)
 
 // Students who are tagged as 1st/2nd Day AND have a login record for active event today
 const dashFirstDayLogins = computed(() => {
-  const firstDayIds = new Set(students.value.filter(s => s.paidDay === 'First Day').map(s => s.studentId))
+  const firstDayIds = new Set(uniqueStudents.value.filter(s => s.paidDay === 'First Day').map(s => s.studentId))
   return new Set(
     activeEventAttendance.value.filter(a => a.date === nowDate() && firstDayIds.has(a.studentId)).map(a => a.studentId)
   ).size
 })
 const dashSecondDayLogins = computed(() => {
-  const secondDayIds = new Set(students.value.filter(s => s.paidDay === 'Second Day').map(s => s.studentId))
+  const secondDayIds = new Set(uniqueStudents.value.filter(s => s.paidDay === 'Second Day').map(s => s.studentId))
   return new Set(
     activeEventAttendance.value.filter(a => a.date === nowDate() && secondDayIds.has(a.studentId)).map(a => a.studentId)
   ).size
