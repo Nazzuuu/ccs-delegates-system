@@ -528,6 +528,8 @@ const editStuId     = ref<string|null>(null)
 const stuForm = ref<{ studentId: string; name: string; yearLevel: string; dept: string }>({ studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' })
 const stuOldStudentId = ref('')   // captures the original studentId before editing
 const stuOldName      = ref('')   // captures the original name before editing
+const stuSyncMsg      = ref('')   // shows "Saving & syncing…" / "Synced ✓" / warning in modal
+const stuSaving       = ref(false)
 const showImportModal = ref(false)
 const excelInputEl  = ref<HTMLInputElement|null>(null)
 const currentStudentPage = ref(1)
@@ -702,8 +704,8 @@ async function generateBarcodes() {
   win.document.close()
 }
 
-function openAddStudent() { editStuId.value = null; stuForm.value = { studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' }; stuOldStudentId.value = ''; stuOldName.value = ''; showStuModal.value = true }
-function openEditStudent(s: Student) { editStuId.value = s.id; stuForm.value = { studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }; stuOldStudentId.value = s.studentId; stuOldName.value = s.name; showStuModal.value = true }
+function openAddStudent() { editStuId.value = null; stuForm.value = { studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' }; stuOldStudentId.value = ''; stuOldName.value = ''; stuSyncMsg.value = ''; stuSaving.value = false; showStuModal.value = true }
+function openEditStudent(s: Student) { editStuId.value = s.id; stuForm.value = { studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }; stuOldStudentId.value = s.studentId; stuOldName.value = s.name; stuSyncMsg.value = ''; stuSaving.value = false; showStuModal.value = true }
 function openImportDialog() { showImportModal.value = true }
 function chooseImportFile() { excelInputEl.value?.click() }
 // Normalize any year level string to canonical "Nth Year" format used in the app
@@ -819,31 +821,48 @@ function processImportFile(file: File) {
   }
   reader.readAsArrayBuffer(file)
 }
-function saveStudent() {
+async function saveStudent() {
   if (!stuForm.value.studentId.trim() || !stuForm.value.name.trim()) { toast('Student ID and Name are required.', 'error'); return }
   if (editStuId.value) {
-    // Convert short year level ("1st Year") back to long form ("First Year") for CCS Delegates sync
+    // ── Edit existing student ──────────────────────────────────────────────
+    stuSaving.value  = true
+    stuSyncMsg.value = 'Saving & syncing to CCS Delegates…'
     const shortToLong: Record<string, string> = {
       '1st Year': 'First Year', '2nd Year': 'Second Year',
       '3rd Year': 'Third Year', '4th Year': 'Fourth Year',
     }
     const newYearLong = shortToLong[stuForm.value.yearLevel] ?? stuForm.value.yearLevel
-
-    updateAttStudent(editStuId.value, { studentId: stuForm.value.studentId, name: stuForm.value.name, yearLevel: stuForm.value.yearLevel, dept: stuForm.value.dept })
-      .then(() => {
-        const i = students.value.findIndex(s => s.id === editStuId.value)
-        if (i !== -1) students.value[i] = { ...students.value[i], id: editStuId.value!, ...stuForm.value }
-        toast('Student updated.', 'success')
-        // Sync the edit back to CCS Delegates system
-        syncDelegateEdit({
-          oldStudentId: stuOldStudentId.value,
-          oldName:      stuOldName.value,
-          newStudentId: stuForm.value.studentId.trim(),
-          newName:      stuForm.value.name.trim(),
-          newYearLevel: newYearLong,
-        }).catch(e => toast(`Synced locally but failed to update CCS Delegates: ${e.message}`, 'error'))
+    try {
+      // 1. Update att-student record
+      await updateAttStudent(editStuId.value, {
+        studentId: stuForm.value.studentId.trim(),
+        name:      stuForm.value.name.trim(),
+        yearLevel: stuForm.value.yearLevel,
+        dept:      stuForm.value.dept,
       })
-      .catch(e => toast(e.message, 'error'))
+      const i = students.value.findIndex(s => s.id === editStuId.value)
+      if (i !== -1) students.value[i] = { ...students.value[i], id: editStuId.value!, ...stuForm.value }
+
+      // 2. Sync back to CCS Delegates system
+      await syncDelegateEdit({
+        oldStudentId: stuOldStudentId.value,
+        oldName:      stuOldName.value,
+        newStudentId: stuForm.value.studentId.trim(),
+        newName:      stuForm.value.name.trim(),
+        newYearLevel: newYearLong,
+      })
+
+      stuSyncMsg.value = ''
+      toast('Student updated & synced to CCS Delegates.', 'success')
+      showStuModal.value = false
+    } catch (e: any) {
+      const msg = e.message ?? 'Failed.'
+      // If att-student saved but CCS sync failed, still close — just show warning
+      stuSyncMsg.value = '⚠ Saved locally, but CCS Delegates sync failed. Try editing again.'
+      toast(msg, 'error')
+    } finally {
+      stuSaving.value = false
+    }
   } else {
     if (students.value.find(s => s.studentId === stuForm.value.studentId)) { toast('Student ID already exists.', 'error'); return }
     if (students.value.find(s => s.name.toLowerCase() === stuForm.value.name.trim().toLowerCase())) { toast(`"${stuForm.value.name.trim()}" already exists.`, 'error'); return }
@@ -3587,9 +3606,16 @@ onMounted(() => {
           <input v-model="stuForm.dept" type="text" class="input-search w-full" />
         </div>
         <div class="flex gap-3 pt-1">
-          <button @click="saveStudent" class="btn-primary flex-1 text-sm">{{ editStuId ? 'Update' : 'Add' }}</button>
-          <button @click="showStuModal=false" class="btn-secondary flex-1 text-sm">Cancel</button>
+          <button @click="saveStudent" :disabled="stuSaving" class="btn-primary flex-1 text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60">
+            <svg v-if="stuSaving" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+            {{ stuSaving ? 'Saving…' : (editStuId ? 'Update' : 'Add') }}
+          </button>
+          <button @click="showStuModal=false" :disabled="stuSaving" class="btn-secondary flex-1 text-sm disabled:opacity-50">Cancel</button>
         </div>
+        <p v-if="stuSyncMsg" class="text-xs flex items-center gap-1.5" :class="stuSyncMsg.startsWith('⚠') ? 'text-orange-500' : 'text-blue-500 dark:text-blue-400'">
+          <svg v-if="stuSaving" class="animate-spin w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+          {{ stuSyncMsg }}
+        </p>
       </div>
     </div>
 
