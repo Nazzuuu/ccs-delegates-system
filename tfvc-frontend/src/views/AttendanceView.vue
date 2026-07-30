@@ -582,27 +582,30 @@ function studentNextPage() {
 }
 
 // ── Generate Barcodes ─────────────────────────────────────────────────────
-function generateBarcodes() {
-  // Use paidRows when available (populated after Pull) — same source of truth as the dashboard.
-  // Fall back to uniqueStudents (deduped att-students) if Pull hasn't been run yet.
-  const source = paidRows.value.length > 0
-    ? paidRows.value.map(r => ({
-        studentId: r.studentId,
-        name: r.name,
+async function generateBarcodes() {
+  // Always fetch fresh paid delegates directly — same source as dashboard Total Students.
+  // This avoids any race condition with paidRows loading state.
+  let source: { studentId: string; name: string; dept: string }[]
+  try {
+    const allDelegates = await fetchAllDelegates()
+    const paid = allDelegates.filter(d => d.status === 'Paid')
+    source = paid
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(d => ({
+        studentId: d.studentId?.trim() || d.name,
+        name: d.name,
         dept: 'CCS',
       }))
-    : uniqueStudents.value.map(s => ({
-        studentId: s.studentId || s.name,
-        name: s.name,
-        dept: s.dept,
-      }))
+  } catch {
+    alert('Failed to fetch paid delegates. Please check your connection.')
+    return
+  }
 
   const list = source
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
 
   if (!list.length) {
-    alert('No paid students found. Click Pull first.')
+    alert('No paid delegates found.')
     return
   }
 
