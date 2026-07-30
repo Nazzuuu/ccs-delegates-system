@@ -1409,7 +1409,7 @@ const paidPullMsg     = ref('')
 const paidPullError   = ref('')
 const paidProgress    = ref(0)
 const paidSearch      = ref('')
-const paidFilterDay   = ref<'All' | 'First Day' | 'Second Day'>('All')
+const paidFilterDay   = ref<'All' | 'First Day' | 'Second Day' | 'No Tag'>('All')
 const paidFilterYear  = ref('All')
 const paidCurrentPage = ref(1)
 const PAID_PAGE_SIZE  = 15
@@ -1616,7 +1616,8 @@ function rptExportCSV() {
 const paidFiltered = computed(() =>
   paidRows.value.filter(r => {
     const matchSearch = r.name.toLowerCase().includes(paidSearch.value.toLowerCase())
-    const matchDay    = paidFilterDay.value === 'All' || r.status === paidFilterDay.value
+    const matchDay    = paidFilterDay.value === 'All'
+      || (paidFilterDay.value === 'No Tag' ? !r.status : r.status === paidFilterDay.value)
     const matchYear   = paidFilterYear.value === 'All' ||
       r.yearLevel.toLowerCase().trim() === paidFilterYear.value.toLowerCase().trim()
     return matchSearch && matchDay && matchYear
@@ -2804,6 +2805,12 @@ onMounted(() => {
                 </div>
                 <select v-model="paidFilterYear" class="input-search sm:w-auto sm:min-w-[150px]">
                   <option v-for="y in paidYearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : shortYear(y) }}</option>
+                </select>
+                <select v-model="paidFilterDay" class="input-search sm:w-auto sm:min-w-[140px]">
+                  <option value="All">All Days</option>
+                  <option value="First Day">1st Day</option>
+                  <option value="Second Day">2nd Day</option>
+                  <option value="No Tag">No Tag</option>
                 </select>
               </div>
             </div>
