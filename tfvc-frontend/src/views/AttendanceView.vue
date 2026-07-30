@@ -583,14 +583,26 @@ function studentNextPage() {
 
 // ── Generate Barcodes ─────────────────────────────────────────────────────
 function generateBarcodes() {
-  // Use all students with a valid studentId, sorted by name
-  const list = students.value
-    .filter(s => s.studentId)
+  // Use paidRows when available (populated after Pull) — same source of truth as the dashboard.
+  // Fall back to uniqueStudents (deduped att-students) if Pull hasn't been run yet.
+  const source = paidRows.value.length > 0
+    ? paidRows.value.map(r => ({
+        studentId: r.studentId,
+        name: r.name,
+        dept: 'CCS',
+      }))
+    : uniqueStudents.value.map(s => ({
+        studentId: s.studentId || s.name,
+        name: s.name,
+        dept: s.dept,
+      }))
+
+  const list = source
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
 
   if (!list.length) {
-    alert('No students with Student IDs found.')
+    alert('No paid students found. Click Pull first.')
     return
   }
 
