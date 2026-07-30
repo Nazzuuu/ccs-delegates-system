@@ -69,15 +69,14 @@ async function handleConfirm() {
 
 // ── Generate Barcodes ─────────────────────────────────────────────────────
 function generateBarcodes() {
-  // All Paid delegates, sorted by name. Those without a studentId fall back to
-  // using their name as the barcode value so every paid delegate gets a card.
+  // All delegates regardless of status, sorted by name.
+  // Those without a studentId fall back to using their name as the barcode value.
   const list = delegates.value
-    .filter(d => d.status === 'Paid')
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
 
   if (!list.length) {
-    alert('No paid delegates found.')
+    alert('No delegates found.')
     return
   }
 
