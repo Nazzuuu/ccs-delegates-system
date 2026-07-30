@@ -325,7 +325,16 @@ const recentAtt    = computed(() => [...attendance.value].reverse().slice(0, 5))
 const activeEventAttendance = computed(() =>
   attendance.value.filter(a => a.eventId === (settings.value.activeEventId || ''))
 )
-const dashTotalStudents  = computed(() => students.value.length)
+const dashTotalStudents  = computed(() => {
+  // Deduplicate: count only unique studentIds (or unique names if studentId missing)
+  // This prevents duplicates in att-students from inflating the Total Students count.
+  const seen = new Set<string>()
+  for (const s of students.value) {
+    const key = s.studentId?.trim() ? s.studentId.trim() : s.name.toUpperCase().trim()
+    seen.add(key)
+  }
+  return seen.size
+})
 const dashTotalLogins    = computed(() => {
   // unique students currently logged in for the active event today
   const s = new Set(activeEventAttendance.value.filter(a => a.date === nowDate()).map(a => a.studentId))
@@ -1644,8 +1653,11 @@ async function setPaidDay(row: PaidRow, day: 'First Day' | 'Second Day') {
     savePaidDayToStorage(row.name, newDay)
 
     // 3. Try to save paidDay to att-student in Strapi (graceful — fails silently if field not yet deployed)
-    // Match ONLY by name (studentId in PaidRow may be the fake delegate numeric id before schema deploy)
+    // Match by studentId first (most reliable), then fall back to name (case-insensitive).
+    // This prevents duplicate att-students when delegate names are uppercase but att-student names differ in case.
     let attStudent = students.value.find(
+      s => row.studentId && s.studentId && s.studentId.trim() === row.studentId.trim()
+    ) ?? students.value.find(
       s => s.name.toUpperCase().trim() === row.name.toUpperCase().trim()
     )
     try {
@@ -1712,7 +1724,8 @@ async function handlePaidPull() {
       // Use real studentId from delegate (populated after Railway deploys the schema)
       // Fall back to name-based localStorage lookup for paidDay
       const strapiDay = students.value.find(
-        s => s.name.toUpperCase().trim() === d.name.toUpperCase().trim()
+        s => (d.studentId && s.studentId && s.studentId.trim() === d.studentId.trim())
+          || s.name.toUpperCase().trim() === d.name.toUpperCase().trim()
       )?.paidDay ?? null
       const localDay = getPaidDayFromStorage(d.name)
       return {
@@ -1725,9 +1738,19 @@ async function handlePaidPull() {
       }
     })
 
-    paidRows.value        = built
+    // Deduplicate by studentId (prefer non-null status) in case of duplicates in the delegates list
+    const deduped = new Map<string, PaidRow>()
+    for (const row of built) {
+      const key = row.studentId?.trim() ? row.studentId.trim() : row.name.toUpperCase().trim()
+      const existing = deduped.get(key)
+      if (!existing || (!existing.status && row.status)) {
+        deduped.set(key, row)
+      }
+    }
+
+    paidRows.value        = [...deduped.values()]
     paidProgress.value    = 100
-    paidPullMsg.value     = `Pulled ${built.length} paid delegate${built.length !== 1 ? 's' : ''}.`
+    paidPullMsg.value     = `Pulled ${deduped.size} paid delegate${deduped.size !== 1 ? 's' : ''}.`
     paidCurrentPage.value = 1
   } catch (err: any) {
     paidPullError.value = err?.message ?? 'Failed to pull paid delegates.'
