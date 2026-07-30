@@ -55,6 +55,7 @@ async function handleAttLogin() {
     attAuth.value = true
     activePage.value = 'dashboard'
     loadAll()
+    handlePaidPull()
     startAutoRefresh()
   } else {
     authError.value = 'Invalid email or password.'
@@ -338,7 +339,11 @@ const uniqueStudents = computed(() => {
   })
 })
 
-const dashTotalStudents  = computed(() => uniqueStudents.value.length)
+const dashTotalStudents  = computed(() =>
+  // Use paidRows when available (after Pull) — it's the authoritative paid count from CCS.
+  // Fall back to uniqueStudents (att-students table) before first Pull.
+  paidRows.value.length > 0 ? paidRows.value.length : uniqueStudents.value.length
+)
 const dashTotalLogins    = computed(() => {
   // unique students currently logged in for the active event today
   const s = new Set(activeEventAttendance.value.filter(a => a.date === nowDate()).map(a => a.studentId))
@@ -358,9 +363,18 @@ const dashTotalCompleted = computed(() => {
 })
 
 // ── 1st Day / 2nd Day stats ─────────────────────────────────────────────────
-// Based on att-students[].paidDay field — use uniqueStudents to avoid double-counting
-const dashTotalFirstDay  = computed(() => uniqueStudents.value.filter(s => s.paidDay === 'First Day').length)
-const dashTotalSecondDay = computed(() => uniqueStudents.value.filter(s => s.paidDay === 'Second Day').length)
+// Use paidRows when available (populated after Pull) — status field = paidDay assigned on Paid page.
+// Fall back to uniqueStudents (att-students paidDay) before first Pull.
+const dashTotalFirstDay  = computed(() =>
+  paidRows.value.length > 0
+    ? paidRows.value.filter(r => r.status === 'First Day').length
+    : uniqueStudents.value.filter(s => s.paidDay === 'First Day').length
+)
+const dashTotalSecondDay = computed(() =>
+  paidRows.value.length > 0
+    ? paidRows.value.filter(r => r.status === 'Second Day').length
+    : uniqueStudents.value.filter(s => s.paidDay === 'Second Day').length
+)
 
 // Students who are tagged as 1st/2nd Day AND have a login record for active event today
 const dashFirstDayLogins = computed(() => {
@@ -1725,20 +1739,16 @@ async function handlePaidPull() {
       return
     }
 
-    // ── Build lookup sets for the current paid delegates ──────────────────
-    // Key: documentId (unique Strapi ID) — used to identify each delegate precisely
-    const paidDocIds    = new Set(paid.map(d => d.documentId))
     const paidStudentIds = new Set(paid.map(d => d.studentId?.trim()).filter(Boolean))
-    const paidNames     = new Set(paid.map(d => d.name.toUpperCase().trim()))
+    const paidNames      = new Set(paid.map(d => d.name.toUpperCase().trim()))
 
-    // ── Reconcile att-students: remove orphans, add missing ───────────────
-    // Orphan = att-student whose studentId/name is NOT in any current paid delegate
-    // Missing = paid delegate who has no matching att-student entry yet
+    // ── Reconcile att-students: remove orphans only ───────────────────────
+    // Orphan = att-student whose studentId/name is NOT in the current paid list.
+    // We do NOT add missing entries here — att-students only holds tagged (1st/2nd day) entries.
     paidPullMsg.value = 'Reconciling attendance students…'
     const currentAttStudents = await fetchAttStudents()
-    paidProgress.value = 50
+    paidProgress.value = 60
 
-    // Delete orphans (no longer paid / deleted from CCS)
     const orphans = currentAttStudents.filter(s => {
       const byId   = s.studentId?.trim() && paidStudentIds.has(s.studentId.trim())
       const byName = paidNames.has(s.name.toUpperCase().trim())
@@ -1749,44 +1759,9 @@ async function handlePaidPull() {
       const orphanIds = new Set(orphans.map(s => s.id))
       students.value = students.value.filter(s => !orphanIds.has(s.id))
     }
-
-    // Add missing paid delegates to att-students
-    const existingStudentIds = new Set(currentAttStudents.filter(s => s.studentId?.trim()).map(s => s.studentId.trim()))
-    const existingNames      = new Set(currentAttStudents.map(s => s.name.toUpperCase().trim()))
-    const toAdd = paid.filter(d => {
-      if (d.studentId?.trim()) return !existingStudentIds.has(d.studentId.trim())
-      return !existingNames.has(d.name.toUpperCase().trim())
-    })
-    if (toAdd.length > 0) {
-      const BATCH = 10
-      for (let i = 0; i < toAdd.length; i += BATCH) {
-        const batch = toAdd.slice(i, i + BATCH)
-        const created = await Promise.allSettled(
-          batch.map(d => createAttStudent({
-            studentId: d.studentId?.trim() || String(d.id),
-            name: d.name,
-            yearLevel: toAttYearLevel(d.yearLevel),
-            dept: 'College of Computer Studies',
-            paidDay: null,
-          }))
-        )
-        created.forEach((r, idx) => {
-          if (r.status === 'fulfilled') {
-            students.value.push({
-              id: r.value.id,
-              studentId: r.value.studentId,
-              name: r.value.name,
-              yearLevel: r.value.yearLevel,
-              dept: r.value.dept,
-              paidDay: r.value.paidDay ?? null,
-            })
-          }
-        })
-      }
-    }
     paidProgress.value = 80
 
-    // ── Build paidRows from the paid list (no dedup — each delegate is unique by documentId) ──
+    // ── Build paidRows — no dedup, each delegate is unique by documentId ──
     const built: PaidRow[] = paid.map(d => {
       const strapiDay = students.value.find(
         s => (d.studentId?.trim() && s.studentId && s.studentId.trim() === d.studentId.trim())
@@ -1835,6 +1810,7 @@ onMounted(() => {
   window.addEventListener('resize', checkMobile)
   if (attAuth.value) {
     loadAll()
+    handlePaidPull()
     startAutoRefresh()
   }
 })
