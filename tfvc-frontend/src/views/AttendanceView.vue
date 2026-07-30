@@ -1724,6 +1724,28 @@ async function handlePaidPull() {
       return
     }
 
+    // ── Build lookup sets for the current paid delegates ──────────────────
+    const paidStudentIds = new Set(paid.map(d => d.studentId?.trim()).filter(Boolean))
+    const paidNames      = new Set(paid.map(d => d.name.toUpperCase().trim()))
+
+    // ── Reconcile att-students: remove orphans that are no longer Paid ────
+    // Fetch the live att-students list so we catch stale entries left by
+    // delegates deleted (or un-paid) after the last pull.
+    paidPullMsg.value = 'Reconciling attendance students…'
+    const currentAttStudents = await fetchAttStudents()
+    const orphans = currentAttStudents.filter(s => {
+      const byId   = s.studentId?.trim() && paidStudentIds.has(s.studentId.trim())
+      const byName = paidNames.has(s.name.toUpperCase().trim())
+      return !byId && !byName  // not found in paid list → orphan
+    })
+    if (orphans.length > 0) {
+      await Promise.all(orphans.map(s => deleteAttStudent(s.id)))
+      // Also remove from local students state so dashboard count updates immediately
+      const orphanIds = new Set(orphans.map(s => s.id))
+      students.value = students.value.filter(s => !orphanIds.has(s.id))
+    }
+    paidProgress.value = 60
+
     const built: PaidRow[] = paid.map(d => {
       // Use real studentId from delegate (populated after Railway deploys the schema)
       // Fall back to name-based localStorage lookup for paidDay
