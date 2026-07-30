@@ -69,14 +69,15 @@ async function handleConfirm() {
 
 // ── Generate Barcodes ─────────────────────────────────────────────────────
 function generateBarcodes() {
-  // Only Paid delegates with a valid studentId, sorted by name
+  // All Paid delegates, sorted by name. Those without a studentId fall back to
+  // using their name as the barcode value so every paid delegate gets a card.
   const list = delegates.value
-    .filter(d => d.status === 'Paid' && d.studentId)
+    .filter(d => d.status === 'Paid')
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
 
   if (!list.length) {
-    alert('No paid delegates with Student IDs found.')
+    alert('No paid delegates found.')
     return
   }
 
@@ -91,8 +92,9 @@ function generateBarcodes() {
     </div>
   `).join('')
 
+  // Use studentId as barcode value; fall back to name for delegates without one
   const barcodeInits = list.map(d => `
-    JsBarcode("#bc-${d.id}", "${d.studentId}", {
+    JsBarcode("#bc-${d.id}", ${JSON.stringify(d.studentId || d.name)}, {
       format: "CODE128",
       width: 2,
       height: 60,

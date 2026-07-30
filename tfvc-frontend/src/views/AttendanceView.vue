@@ -10,7 +10,7 @@ import {
   fetchAttLogouts,  createAttLogout,  deleteAllAttLogouts, type AttLogout,
   fetchAttWinners,  createAttWinner,  deleteAttWinner,  deleteAllAttWinners,  type AttWinner,
   fetchAttSetting,  saveAttSetting,   type AttSetting,
-  fetchAllDelegates, updateDelegate, type StrapiDelegate,
+  fetchAllDelegates, updateDelegate, toAttYearLevel, type StrapiDelegate,
 } from '../api/strapi'
 
 // Local interface aliases (kept for backward compat with template)
@@ -1715,8 +1715,8 @@ async function handlePaidPull() {
 
   try {
     paidPullMsg.value = 'Fetching paid delegates…'
-    const delegates: StrapiDelegate[] = await fetchAllDelegates()
-    const paid = delegates.filter(d => d.status === 'Paid')
+    const allDelegates: StrapiDelegate[] = await fetchAllDelegates()
+    const paid = allDelegates.filter(d => d.status === 'Paid')
     paidProgress.value = 30
 
     if (paid.length === 0) {
@@ -1725,58 +1725,86 @@ async function handlePaidPull() {
     }
 
     // ── Build lookup sets for the current paid delegates ──────────────────
+    // Key: documentId (unique Strapi ID) — used to identify each delegate precisely
+    const paidDocIds    = new Set(paid.map(d => d.documentId))
     const paidStudentIds = new Set(paid.map(d => d.studentId?.trim()).filter(Boolean))
-    const paidNames      = new Set(paid.map(d => d.name.toUpperCase().trim()))
+    const paidNames     = new Set(paid.map(d => d.name.toUpperCase().trim()))
 
-    // ── Reconcile att-students: remove orphans that are no longer Paid ────
-    // Fetch the live att-students list so we catch stale entries left by
-    // delegates deleted (or un-paid) after the last pull.
+    // ── Reconcile att-students: remove orphans, add missing ───────────────
+    // Orphan = att-student whose studentId/name is NOT in any current paid delegate
+    // Missing = paid delegate who has no matching att-student entry yet
     paidPullMsg.value = 'Reconciling attendance students…'
     const currentAttStudents = await fetchAttStudents()
+    paidProgress.value = 50
+
+    // Delete orphans (no longer paid / deleted from CCS)
     const orphans = currentAttStudents.filter(s => {
       const byId   = s.studentId?.trim() && paidStudentIds.has(s.studentId.trim())
       const byName = paidNames.has(s.name.toUpperCase().trim())
-      return !byId && !byName  // not found in paid list → orphan
+      return !byId && !byName
     })
     if (orphans.length > 0) {
       await Promise.all(orphans.map(s => deleteAttStudent(s.id)))
-      // Also remove from local students state so dashboard count updates immediately
       const orphanIds = new Set(orphans.map(s => s.id))
       students.value = students.value.filter(s => !orphanIds.has(s.id))
     }
-    paidProgress.value = 60
 
+    // Add missing paid delegates to att-students
+    const existingStudentIds = new Set(currentAttStudents.filter(s => s.studentId?.trim()).map(s => s.studentId.trim()))
+    const existingNames      = new Set(currentAttStudents.map(s => s.name.toUpperCase().trim()))
+    const toAdd = paid.filter(d => {
+      if (d.studentId?.trim()) return !existingStudentIds.has(d.studentId.trim())
+      return !existingNames.has(d.name.toUpperCase().trim())
+    })
+    if (toAdd.length > 0) {
+      const BATCH = 10
+      for (let i = 0; i < toAdd.length; i += BATCH) {
+        const batch = toAdd.slice(i, i + BATCH)
+        const created = await Promise.allSettled(
+          batch.map(d => createAttStudent({
+            studentId: d.studentId?.trim() || String(d.id),
+            name: d.name,
+            yearLevel: toAttYearLevel(d.yearLevel),
+            dept: 'College of Computer Studies',
+            paidDay: null,
+          }))
+        )
+        created.forEach((r, idx) => {
+          if (r.status === 'fulfilled') {
+            students.value.push({
+              id: r.value.id,
+              studentId: r.value.studentId,
+              name: r.value.name,
+              yearLevel: r.value.yearLevel,
+              dept: r.value.dept,
+              paidDay: r.value.paidDay ?? null,
+            })
+          }
+        })
+      }
+    }
+    paidProgress.value = 80
+
+    // ── Build paidRows from the paid list (no dedup — each delegate is unique by documentId) ──
     const built: PaidRow[] = paid.map(d => {
-      // Use real studentId from delegate (populated after Railway deploys the schema)
-      // Fall back to name-based localStorage lookup for paidDay
       const strapiDay = students.value.find(
-        s => (d.studentId && s.studentId && s.studentId.trim() === d.studentId.trim())
+        s => (d.studentId?.trim() && s.studentId && s.studentId.trim() === d.studentId.trim())
           || s.name.toUpperCase().trim() === d.name.toUpperCase().trim()
       )?.paidDay ?? null
       const localDay = getPaidDayFromStorage(d.name)
       return {
         id: d.id,
         documentId: d.documentId,
-        studentId: d.studentId || String(d.id),  // real student ID once schema deployed
+        studentId: d.studentId?.trim() || String(d.id),
         name: d.name,
         yearLevel: d.yearLevel,
         status: strapiDay ?? localDay,
       }
     })
 
-    // Deduplicate by studentId (prefer non-null status) in case of duplicates in the delegates list
-    const deduped = new Map<string, PaidRow>()
-    for (const row of built) {
-      const key = row.studentId?.trim() ? row.studentId.trim() : row.name.toUpperCase().trim()
-      const existing = deduped.get(key)
-      if (!existing || (!existing.status && row.status)) {
-        deduped.set(key, row)
-      }
-    }
-
-    paidRows.value        = [...deduped.values()]
+    paidRows.value        = built
     paidProgress.value    = 100
-    paidPullMsg.value     = `Pulled ${deduped.size} paid delegate${deduped.size !== 1 ? 's' : ''}.`
+    paidPullMsg.value     = `Pulled ${built.length} paid delegate${built.length !== 1 ? 's' : ''}.`
     paidCurrentPage.value = 1
   } catch (err: any) {
     paidPullError.value = err?.message ?? 'Failed to pull paid delegates.'

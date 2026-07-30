@@ -665,7 +665,7 @@ export interface DelegateSyncPayload {
  * Convert delegates yearLevel ("First Year" / "Second Year" / etc.)
  * to the short form used by the attendance system ("1st Year" / "2nd Year" / etc.)
  */
-function toAttYearLevel(delegateYear: string): string {
+export function toAttYearLevel(delegateYear: string): string {
   const map: Record<string, string> = {
     'First Year':  '1st Year',
     'Second Year': '2nd Year',
