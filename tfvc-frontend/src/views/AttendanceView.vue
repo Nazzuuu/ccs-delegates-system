@@ -10,7 +10,7 @@ import {
   fetchAttLogouts,  createAttLogout,  deleteAllAttLogouts, type AttLogout,
   fetchAttWinners,  createAttWinner,  deleteAttWinner,  deleteAllAttWinners,  type AttWinner,
   fetchAttSetting,  saveAttSetting,   type AttSetting,
-  fetchAllDelegates, updateDelegate, toAttYearLevel, type StrapiDelegate,
+  fetchAllDelegates, updateDelegate, toAttYearLevel, syncDelegateEdit, type StrapiDelegate,
 } from '../api/strapi'
 
 // Local interface aliases (kept for backward compat with template)
@@ -526,6 +526,8 @@ const stuDayFilter  = ref<'All' | 'First Day' | 'Second Day'>('All')
 const showStuModal  = ref(false)
 const editStuId     = ref<string|null>(null)
 const stuForm = ref<{ studentId: string; name: string; yearLevel: string; dept: string }>({ studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' })
+const stuOldStudentId = ref('')   // captures the original studentId before editing
+const stuOldName      = ref('')   // captures the original name before editing
 const showImportModal = ref(false)
 const excelInputEl  = ref<HTMLInputElement|null>(null)
 const currentStudentPage = ref(1)
@@ -700,8 +702,8 @@ async function generateBarcodes() {
   win.document.close()
 }
 
-function openAddStudent() { editStuId.value = null; stuForm.value = { studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' }; showStuModal.value = true }
-function openEditStudent(s: Student) { editStuId.value = s.id; stuForm.value = { studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }; showStuModal.value = true }
+function openAddStudent() { editStuId.value = null; stuForm.value = { studentId: '', name: '', yearLevel: '1st Year', dept: 'CCS' }; stuOldStudentId.value = ''; stuOldName.value = ''; showStuModal.value = true }
+function openEditStudent(s: Student) { editStuId.value = s.id; stuForm.value = { studentId: s.studentId, name: s.name, yearLevel: s.yearLevel, dept: s.dept }; stuOldStudentId.value = s.studentId; stuOldName.value = s.name; showStuModal.value = true }
 function openImportDialog() { showImportModal.value = true }
 function chooseImportFile() { excelInputEl.value?.click() }
 // Normalize any year level string to canonical "Nth Year" format used in the app
@@ -820,11 +822,26 @@ function processImportFile(file: File) {
 function saveStudent() {
   if (!stuForm.value.studentId.trim() || !stuForm.value.name.trim()) { toast('Student ID and Name are required.', 'error'); return }
   if (editStuId.value) {
+    // Convert short year level ("1st Year") back to long form ("First Year") for CCS Delegates sync
+    const shortToLong: Record<string, string> = {
+      '1st Year': 'First Year', '2nd Year': 'Second Year',
+      '3rd Year': 'Third Year', '4th Year': 'Fourth Year',
+    }
+    const newYearLong = shortToLong[stuForm.value.yearLevel] ?? stuForm.value.yearLevel
+
     updateAttStudent(editStuId.value, { studentId: stuForm.value.studentId, name: stuForm.value.name, yearLevel: stuForm.value.yearLevel, dept: stuForm.value.dept })
       .then(() => {
         const i = students.value.findIndex(s => s.id === editStuId.value)
         if (i !== -1) students.value[i] = { ...students.value[i], id: editStuId.value!, ...stuForm.value }
         toast('Student updated.', 'success')
+        // Sync the edit back to CCS Delegates system
+        syncDelegateEdit({
+          oldStudentId: stuOldStudentId.value,
+          oldName:      stuOldName.value,
+          newStudentId: stuForm.value.studentId.trim(),
+          newName:      stuForm.value.name.trim(),
+          newYearLevel: newYearLong,
+        }).catch(e => toast(`Synced locally but failed to update CCS Delegates: ${e.message}`, 'error'))
       })
       .catch(e => toast(e.message, 'error'))
   } else {
