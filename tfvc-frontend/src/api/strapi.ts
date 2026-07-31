@@ -88,7 +88,8 @@ export async function createDelegate(
   })
   if (!res.ok) {
     const txt = await res.text()
-    throw new Error(`Create failed: ${res.status} ${txt}`)
+    const err = Object.assign(new Error(`Create failed: ${res.status} ${txt}`), { status: res.status })
+    throw err
   }
   const json = await res.json()
   return mapEntry(json.data)
@@ -133,7 +134,9 @@ export async function importDelegates(
   rows: ImportRow[],
   existing: StrapiDelegate[]
 ): Promise<ImportResult> {
-  const existingNames = new Set(existing.map(d => d.name.toLowerCase()))
+  // Build a live set of names we already know about — updated as we successfully add each row
+  // so that duplicates within the same import file are also caught before hitting the server.
+  const importedNames = new Set(existing.map(d => d.name.trim().toUpperCase()))
   const result: ImportResult = { added: 0, skipped: [], failed: [] }
 
   // Valid year levels accepted from the file
@@ -141,34 +144,38 @@ export async function importDelegates(
 
   const toImport = rows.filter(r => {
     if (!r.name?.trim()) { result.skipped.push(r.name ?? '(empty)'); return false }
-    if (existingNames.has(r.name.trim().toUpperCase().toLowerCase())) {
-      result.skipped.push(r.name.trim()); return false
-    }
+    const upper = r.name.trim().toUpperCase()
+    if (importedNames.has(upper)) { result.skipped.push(r.name.trim()); return false }
     if (!validYears.has(r.yearLevel)) { result.skipped.push(r.name.trim()); return false }
     return true
   })
 
-  // Process in batches of 10
-  const BATCH = 10
-  for (let i = 0; i < toImport.length; i += BATCH) {
-    const batch = toImport.slice(i, i + BATCH)
-    await Promise.all(
-      batch.map(async r => {
-        try {
-          await createDelegate({
-            name: r.name.trim().toUpperCase(),
-            yearLevel: r.yearLevel,
-            studentId: r.studentId?.trim() ?? '',
-            status: 'Not Paid',
-            isPaid: false,
-            isReceived: false,
-          })
-          result.added++
-        } catch {
-          result.failed.push(r.name.trim())
-        }
+  // Process SEQUENTIALLY to prevent race-condition duplicates within the same batch.
+  // Each row is added one at a time; if the server returns 409 (duplicate), treat as skip.
+  for (const r of toImport) {
+    const upper = r.name.trim().toUpperCase()
+    // Double-check the live set (handles duplicates within the file itself)
+    if (importedNames.has(upper)) { result.skipped.push(r.name.trim()); continue }
+    try {
+      await createDelegate({
+        name: upper,
+        yearLevel: r.yearLevel,
+        studentId: r.studentId?.trim() ?? '',
+        status: 'Not Paid',
+        isPaid: false,
+        isReceived: false,
       })
-    )
+      importedNames.add(upper)   // mark as imported so any later duplicate in this file is skipped
+      result.added++
+    } catch (e: any) {
+      // 409 Conflict = server-side dedup kicked in → treat as a skip, not an error
+      if (e?.status === 409 || String(e?.message ?? '').includes('already exists') || String(e?.message ?? '').includes('DUPLICATE')) {
+        result.skipped.push(r.name.trim())
+        importedNames.add(upper)
+      } else {
+        result.failed.push(r.name.trim())
+      }
+    }
   }
 
   return result
@@ -346,7 +353,10 @@ export async function createAttStudent(data: Omit<AttStudent, 'id'>): Promise<At
     method: 'POST', headers,
     body: JSON.stringify({ data }),
   })
-  if (!res.ok) throw new Error(`createAttStudent failed: ${res.status}`)
+  if (!res.ok) {
+    const txt = await res.text()
+    throw Object.assign(new Error(`createAttStudent failed: ${res.status} ${txt}`), { status: res.status })
+  }
   return mapAttStudent((await res.json()).data)
 }
 
@@ -369,15 +379,27 @@ export async function deleteAllAttStudents(): Promise<void> {
   await Promise.all(all.map(s => deleteAttStudent(s.id)))
 }
 
-export async function bulkCreateAttStudents(rows: Omit<AttStudent, 'id'>[]): Promise<{ added: number; failed: string[] }> {
-  const result = { added: 0, failed: [] as string[] }
-  const BATCH = 10
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH)
-    await Promise.all(batch.map(async r => {
-      try { await createAttStudent(r); result.added++ }
-      catch { result.failed.push(r.name) }
-    }))
+export async function bulkCreateAttStudents(rows: Omit<AttStudent, 'id'>[]): Promise<{ added: number; skipped: number; failed: string[] }> {
+  const result = { added: 0, skipped: 0, failed: [] as string[] }
+  // Track names imported so far to deduplicate within the file itself
+  const imported = new Set<string>()
+
+  for (const r of rows) {
+    const key = String(r.name ?? '').trim().toUpperCase()
+    if (imported.has(key)) { result.skipped++; continue }
+    try {
+      await createAttStudent(r)
+      imported.add(key)
+      result.added++
+    } catch (e: any) {
+      // 409 = server-side dedup caught a duplicate → skip, not failure
+      if (e?.status === 409 || String(e?.message ?? '').includes('already exists') || String(e?.message ?? '').includes('DUPLICATE')) {
+        result.skipped++
+        imported.add(key)
+      } else {
+        result.failed.push(r.name)
+      }
+    }
   }
   return result
 }
