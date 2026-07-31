@@ -2,10 +2,18 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useDelegates } from '../composables/useDelegates'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import {
+  fetchAllNonDelegates,
+  updateNonDelegate,
+  type NonDelegate,
+} from '../api/strapi'
 
 const { delegates, filtered, loading, error, searchQuery, filterStatus, filterYear, yearLevels, shortYear, markPaid, markUnpaid, markBackout, loadDelegates } = useDelegates()
 
-onMounted(() => loadDelegates(true))  // force=true ensures fresh data from Strapi on every mount
+onMounted(() => {
+  loadDelegates(true)
+  loadNonDelegates()
+})
 
 // ── Active tab ────────────────────────────────────────────────────────────
 const activeTab = ref<'delegates' | 'non-delegates'>('delegates')
@@ -25,21 +33,37 @@ const paidCount    = computed(() => delegates.value.filter(d => d.status === 'Pa
 const unpaidCount  = computed(() => delegates.value.filter(d => d.status === 'Not Paid').length)
 const backoutCount = computed(() => delegates.value.filter(d => d.status === 'Backout').length)
 
-// ── Non-Delegates (backout list) ──────────────────────────────────────────
-const ndSearch      = ref('')
-const ndFilterYear  = ref('All')
-const ndCurrentPage = ref(1)
-const ND_PAGE_SIZE  = 10
+// ── Non-Delegates — own Strapi collection ─────────────────────────────────
+const nonDelegates    = ref<NonDelegate[]>([])
+const ndLoading       = ref(false)
+const ndError         = ref<string | null>(null)
+const ndSearch        = ref('')
+const ndFilterYear    = ref('All')
+const ndFilterStatus  = ref<'All' | 'Paid' | 'Not Paid' | 'Backout'>('All')
+const ndCurrentPage   = ref(1)
+const ND_PAGE_SIZE    = 10
 
-watch([ndSearch, ndFilterYear], () => { ndCurrentPage.value = 1 })
+async function loadNonDelegates() {
+  ndLoading.value = true
+  ndError.value   = null
+  try {
+    nonDelegates.value = await fetchAllNonDelegates()
+  } catch (e: any) {
+    ndError.value = e.message ?? 'Failed to load non-delegates'
+  } finally {
+    ndLoading.value = false
+  }
+}
+
+watch([ndSearch, ndFilterYear, ndFilterStatus], () => { ndCurrentPage.value = 1 })
 
 const ndFiltered = computed(() =>
-  delegates.value.filter(d => {
-    if (d.status !== 'Backout') return false
+  nonDelegates.value.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(ndSearch.value.toLowerCase())
     const matchYear   = ndFilterYear.value === 'All' ||
       d.yearLevel.toLowerCase().trim() === ndFilterYear.value.toLowerCase().trim()
-    return matchSearch && matchYear
+    const matchStatus = ndFilterStatus.value === 'All' || d.status === ndFilterStatus.value
+    return matchSearch && matchYear && matchStatus
   })
 )
 
@@ -47,6 +71,10 @@ const ndTotalPages = computed(() => Math.max(1, Math.ceil(ndFiltered.value.lengt
 const ndPaginated  = computed(() =>
   ndFiltered.value.slice((ndCurrentPage.value - 1) * ND_PAGE_SIZE, ndCurrentPage.value * ND_PAGE_SIZE)
 )
+
+const ndPaidCount    = computed(() => nonDelegates.value.filter(d => d.status === 'Paid').length)
+const ndNotPaidCount = computed(() => nonDelegates.value.filter(d => d.status === 'Not Paid').length)
+const ndBackoutCount = computed(() => nonDelegates.value.filter(d => d.status === 'Backout').length)
 
 let _ndPageChanging = false
 function ndPrevPage() {
@@ -58,6 +86,34 @@ function ndNextPage() {
   if (_ndPageChanging || ndCurrentPage.value >= ndTotalPages.value) return
   _ndPageChanging = true; ndCurrentPage.value++
   setTimeout(() => { _ndPageChanging = false }, 300)
+}
+
+// ── Non-Delegate actions ──────────────────────────────────────────────────
+const ndActionLoading = ref<Set<number>>(new Set())
+
+async function ndMarkPaid(nd: NonDelegate) {
+  if (ndActionLoading.value.has(nd.id)) return
+  ndActionLoading.value = new Set([...ndActionLoading.value, nd.id])
+  try {
+    const now = new Date().toISOString()
+    await updateNonDelegate(nd.documentId, { status: 'Paid', paidAt: now })
+    const found = nonDelegates.value.find(x => x.id === nd.id)
+    if (found) { found.status = 'Paid'; found.paidAt = now }
+  } finally {
+    ndActionLoading.value = new Set([...ndActionLoading.value].filter(x => x !== nd.id))
+  }
+}
+
+async function ndMarkBackout(nd: NonDelegate) {
+  if (ndActionLoading.value.has(nd.id)) return
+  ndActionLoading.value = new Set([...ndActionLoading.value, nd.id])
+  try {
+    await updateNonDelegate(nd.documentId, { status: 'Backout', paidAt: null })
+    const found = nonDelegates.value.find(x => x.id === nd.id)
+    if (found) { found.status = 'Backout'; found.paidAt = null }
+  } finally {
+    ndActionLoading.value = new Set([...ndActionLoading.value].filter(x => x !== nd.id))
+  }
 }
 
 let _pageChanging = false
@@ -254,7 +310,7 @@ function generateBarcodes() {
         class="px-4 py-1.5 rounded-md text-sm font-semibold transition-all"
       >
         Non-Delegates
-        <span v-if="backoutCount" class="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-gray-400 dark:bg-gray-500 text-white">{{ backoutCount }}</span>
+        <span v-if="nonDelegates.length" class="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold bg-gray-400 dark:bg-gray-500 text-white">{{ nonDelegates.length }}</span>
       </button>
     </div>
 
@@ -350,8 +406,16 @@ function generateBarcodes() {
     <template v-if="activeTab === 'non-delegates'">
 
       <!-- Stats -->
-      <div class="grid grid-cols-1 sm:grid-cols-1 gap-3 sm:gap-4 mb-4 sm:mb-6 max-w-xs">
-        <div class="card p-3 sm:p-4"><p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Backout</p><p class="text-2xl sm:text-3xl font-bold text-gray-400 mt-1">{{ backoutCount }}</p></div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div class="card p-3 sm:p-4"><p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p><p class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ nonDelegates.length }}</p></div>
+        <div class="card p-3 sm:p-4 border-green-200 dark:border-green-900"><p class="text-xs text-sync-green font-medium uppercase tracking-wide">Paid</p><p class="text-2xl sm:text-3xl font-bold text-sync-green mt-1">{{ ndPaidCount }}</p></div>
+        <div class="card p-3 sm:p-4"><p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Backout</p><p class="text-2xl sm:text-3xl font-bold text-gray-400 mt-1">{{ ndBackoutCount }}</p></div>
+      </div>
+
+      <!-- Error -->
+      <div v-if="ndError" class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        {{ ndError }}
       </div>
 
       <!-- Filters -->
@@ -363,6 +427,11 @@ function generateBarcodes() {
             </span>
             <input v-model="ndSearch" type="text" placeholder="Search name..." class="input-search pl-9"/>
           </div>
+          <select v-model="ndFilterStatus" class="input-search sm:w-auto sm:min-w-[140px]">
+            <option value="All">All Status</option>
+            <option value="Paid">Paid</option>
+            <option value="Backout">Backout</option>
+          </select>
           <select v-model="ndFilterYear" class="input-search sm:w-auto sm:min-w-[140px]">
             <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : shortYear(y) }}</option>
           </select>
@@ -371,9 +440,9 @@ function generateBarcodes() {
 
       <!-- Table -->
       <div class="card overflow-hidden">
-        <div v-if="loading" class="flex items-center justify-center py-16 text-gray-400">
+        <div v-if="ndLoading" class="flex items-center justify-center py-16 text-gray-400">
           <svg class="animate-spin h-6 w-6 mr-3 text-sync-green" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
-          Loading...
+          Loading non-delegates...
         </div>
         <div v-else class="overflow-x-auto">
           <table class="w-full min-w-[560px]">
@@ -391,20 +460,38 @@ function generateBarcodes() {
                 <td class="table-td font-mono text-xs text-gray-500 dark:text-gray-400">{{ d.studentId || '—' }}</td>
                 <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
                 <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
-                <td class="table-td"><span :class="{'badge-paid': d.status==='Paid','badge-backout': d.status==='Backout'}">{{ d.status }}</span></td>
+                <td class="table-td">
+                  <span :class="d.status === 'Paid' ? 'badge-paid' : 'badge-backout'">{{ d.status }}</span>
+                </td>
                 <td class="table-td text-center">
                   <div class="flex items-center justify-center gap-1.5 flex-wrap">
-                    <button v-if="d.status !== 'Paid'" @click="askConfirm(d.id, d.name, 'paid')" class="btn-success inline-flex items-center gap-1 text-xs px-2.5 py-1">
-                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Paid
+                    <button
+                      v-if="d.status !== 'Paid'"
+                      @click="ndMarkPaid(d)"
+                      :disabled="ndActionLoading.has(d.id)"
+                      class="btn-success inline-flex items-center gap-1 text-xs px-2.5 py-1 disabled:opacity-50"
+                    >
+                      <svg v-if="ndActionLoading.has(d.id)" class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                      <svg v-else class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      Paid
                     </button>
-                    <button v-if="d.status !== 'Backout'" @click="askConfirm(d.id, d.name, 'backout')" class="btn-danger inline-flex items-center gap-1 text-xs px-2.5 py-1">
-                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>Backout
+                    <button
+                      v-if="d.status === 'Paid'"
+                      @click="ndMarkBackout(d)"
+                      :disabled="ndActionLoading.has(d.id)"
+                      class="btn-secondary inline-flex items-center gap-1 text-xs px-2.5 py-1 disabled:opacity-50"
+                    >
+                      <svg v-if="ndActionLoading.has(d.id)" class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                      <svg v-else class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                      Undo
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="ndPaginated.length === 0">
-                <td colspan="6" class="table-td text-center text-gray-400 py-10">No backout students found.</td>
+                <td colspan="6" class="table-td text-center text-gray-400 py-10">
+                  {{ nonDelegates.length === 0 ? 'No non-delegates found.' : 'No results match your filters.' }}
+                </td>
               </tr>
             </tbody>
           </table>

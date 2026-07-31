@@ -794,3 +794,87 @@ export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<vo
     ),
   ])
 }
+
+// ── Non-Delegates ─────────────────────────────────────────────────────────────
+
+export interface NonDelegate {
+  id: number
+  documentId: string
+  name: string
+  studentId: string
+  yearLevel: string
+  status: 'Paid' | 'Not Paid' | 'Backout'
+  paidAt?: string | null
+}
+
+function mapNonDelegate(d: any): NonDelegate {
+  return {
+    id: d.id,
+    documentId: d.documentId,
+    name: d.name ?? '',
+    studentId: d.studentId ?? '',
+    yearLevel: d.yearLevel ?? '',
+    status: d.status ?? 'Backout',
+    paidAt: d.paidAt ?? null,
+  }
+}
+
+/** Fetch ALL non-delegates (handles pagination). */
+export async function fetchAllNonDelegates(): Promise<NonDelegate[]> {
+  const PAGE = 500
+  let page = 1
+  const all: NonDelegate[] = []
+  while (true) {
+    const res = await fetch(
+      `${BASE}/non-delegates?pagination[page]=${page}&pagination[pageSize]=${PAGE}&sort=name:ASC`,
+      { headers }
+    )
+    if (!res.ok) throw new Error(`fetchAllNonDelegates failed: ${res.status}`)
+    const json = await res.json()
+    all.push(...json.data.map(mapNonDelegate))
+    if (page >= json.meta.pagination.pageCount) break
+    page++
+  }
+  return all
+}
+
+/** Create a new non-delegate entry. */
+export async function createNonDelegate(
+  data: Omit<NonDelegate, 'id' | 'documentId'>
+): Promise<NonDelegate> {
+  const res = await fetch(`${BASE}/non-delegates`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) {
+    const txt = await res.text()
+    throw Object.assign(new Error(`createNonDelegate failed: ${res.status} ${txt}`), { status: res.status })
+  }
+  return mapNonDelegate((await res.json()).data)
+}
+
+/** Update a non-delegate by documentId. */
+export async function updateNonDelegate(
+  documentId: string,
+  data: Partial<Pick<NonDelegate, 'status' | 'paidAt'>>
+): Promise<void> {
+  const res = await fetch(`${BASE}/non-delegates/${documentId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) {
+    const txt = await res.text()
+    throw new Error(`updateNonDelegate failed: ${res.status} ${txt}`)
+  }
+}
+
+/** Delete a non-delegate by documentId. */
+export async function deleteNonDelegate(documentId: string): Promise<void> {
+  const res = await fetch(`${BASE}/non-delegates/${documentId}`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) throw new Error(`deleteNonDelegate failed: ${res.status}`)
+}

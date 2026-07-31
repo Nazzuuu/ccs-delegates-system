@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "non_delegates",
+  "info": {
+    "singularName": "non-delegate",
+    "pluralName": "non-delegates",
+    "displayName": "Non-Delegate",
+    "description": "Backout delegates tracked independently from the main delegates list"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "studentId": {
+      "type": "string"
+    },
+    "yearLevel": {
+      "type": "enumeration",
+      "enum": [
+        "First Year",
+        "Second Year",
+        "Third Year",
+        "Fourth Year"
+      ],
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "Paid",
+        "Not Paid",
+        "Backout"
+      ],
+      "required": true,
+      "default": "Backout"
+    },
+    "paidAt": {
+      "type": "datetime"
+    }
+  }
+}
