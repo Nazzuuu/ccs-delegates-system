@@ -1826,17 +1826,15 @@ async function handlePaidPull() {
     }
     paidProgress.value = 80
 
-    // ── Build paidRows — dedup by studentId first, then by name ──
-    // Removes duplicates (same studentId or same name) keeping the first occurrence.
-    const seenIds   = new Set<string>()
-    const seenNames = new Set<string>()
+    // ── Build paidRows — dedup by studentId only ──
+    // Only remove exact duplicates where the same studentId appears more than once.
+    // Different students can share similar names so name-based dedup is intentionally avoided.
+    const seenIds = new Set<string>()
     const dedupedPaid = paid.filter(d => {
-      const sid  = d.studentId?.trim()
-      const nameKey = d.name.toUpperCase().trim()
-      if (sid && seenIds.has(sid))     return false
-      if (seenNames.has(nameKey))       return false
-      if (sid) seenIds.add(sid)
-      seenNames.add(nameKey)
+      const sid = d.studentId?.trim()
+      if (!sid) return true          // no studentId — always keep
+      if (seenIds.has(sid)) return false
+      seenIds.add(sid)
       return true
     })
     const built: PaidRow[] = dedupedPaid.map(d => {
