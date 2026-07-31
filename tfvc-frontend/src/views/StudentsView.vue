@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useDelegates } from '../composables/useDelegates'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
-const { delegates, filtered, loading, error, searchQuery, filterStatus, filterYear, yearLevels, shortYear, markPaid, markUnpaid, markBackout, backoutList, loadDelegates } = useDelegates()
+const { delegates, filtered, loading, error, searchQuery, filterStatus, filterYear, yearLevels, shortYear, markPaid, markUnpaid, markBackout, backoutList, ndMarkPaid, ndMarkUndo, loadDelegates } = useDelegates()
 
 onMounted(() => {
   loadDelegates(true)
@@ -38,8 +38,8 @@ const ndList = computed(() =>
   delegates.value.filter(d => d.isBackout)
 )
 
-const ndPaidCount    = computed(() => ndList.value.filter(d => d.status === 'Paid').length)
-const ndNotPaidCount = computed(() => ndList.value.filter(d => d.status === 'Backout').length)
+const ndPaidCount    = computed(() => ndList.value.filter(d => d.ndPaid).length)
+const ndNotPaidCount = computed(() => ndList.value.filter(d => !d.ndPaid).length)
 
 watch([ndSearch, ndFilterYear], () => { ndCurrentPage.value = 1 })
 
@@ -61,24 +61,21 @@ const ndPaginated  = computed(() =>
 // ── Non-Delegate actions ──────────────────────────────────────────────────
 const ndActionLoading = ref<Set<number>>(new Set())
 
-async function ndMarkPaid(id: number) {
+async function handleNdMarkPaid(id: number) {
   if (ndActionLoading.value.has(id)) return
   ndActionLoading.value = new Set([...ndActionLoading.value, id])
   try {
-    await markPaid(id)
-    // isBackout stays true in Strapi — delegate remains in backoutList and ndList
+    await ndMarkPaid(id)  // sets ndPaid=true only, status stays Backout
   } finally {
     ndActionLoading.value = new Set([...ndActionLoading.value].filter(x => x !== id))
   }
 }
 
-async function ndMarkUndo(id: number) {
+async function handleNdMarkUndo(id: number) {
   if (ndActionLoading.value.has(id)) return
   ndActionLoading.value = new Set([...ndActionLoading.value, id])
   try {
-    // Undo paid → revert to Backout (not Not Paid), so they stay in this list
-    await markBackout(id)
-    paidFromNd.value = new Set([...paidFromNd.value].filter(x => x !== id))
+    await ndMarkUndo(id)  // sets ndPaid=false only, status stays Backout
   } finally {
     ndActionLoading.value = new Set([...ndActionLoading.value].filter(x => x !== id))
   }
@@ -429,13 +426,13 @@ function generateBarcodes() {
                 <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
                 <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
                 <td class="table-td">
-                  <span :class="d.status === 'Paid' ? 'badge-paid' : 'badge-backout'">{{ d.status }}</span>
+                  <span :class="d.ndPaid ? 'badge-paid' : 'badge-backout'">{{ d.ndPaid ? 'Paid' : 'Backout' }}</span>
                 </td>
                 <td class="table-td text-center">
                   <div class="flex items-center justify-center gap-1.5 flex-wrap">
                     <button
-                      v-if="d.status !== 'Paid'"
-                      @click="ndMarkPaid(d.id)"
+                      v-if="!d.ndPaid"
+                      @click="handleNdMarkPaid(d.id)"
                       :disabled="ndActionLoading.has(d.id)"
                       class="btn-success inline-flex items-center gap-1 text-xs px-2.5 py-1 disabled:opacity-50"
                     >
@@ -444,8 +441,8 @@ function generateBarcodes() {
                       Paid
                     </button>
                     <button
-                      v-if="d.status === 'Paid'"
-                      @click="ndMarkUndo(d.id)"
+                      v-if="d.ndPaid"
+                      @click="handleNdMarkUndo(d.id)"
                       :disabled="ndActionLoading.has(d.id)"
                       class="btn-secondary inline-flex items-center gap-1 text-xs px-2.5 py-1 disabled:opacity-50"
                     >

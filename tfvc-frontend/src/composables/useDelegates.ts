@@ -173,6 +173,21 @@ export function useDelegates() {
     })
   }
 
+  // ── Non-Delegate payment tracking (status stays Backout) ─────────────────
+  async function ndMarkPaid(id: number) {
+    const d = delegates.value.find(x => x.id === id)
+    if (!d) return
+    d.ndPaid = true
+    await updateDelegate(d.documentId, { ndPaid: true })
+  }
+
+  async function ndMarkUndo(id: number) {
+    const d = delegates.value.find(x => x.id === id)
+    if (!d) return
+    d.ndPaid = false
+    await updateDelegate(d.documentId, { ndPaid: false })
+  }
+
   return {
     delegates,
     loading,
@@ -190,6 +205,8 @@ export function useDelegates() {
     markBackout,
     markReceived,
     markNotReceived,
+    ndMarkPaid,
+    ndMarkUndo,
     addDelegate,
     removeDelegate,
     editDelegate,

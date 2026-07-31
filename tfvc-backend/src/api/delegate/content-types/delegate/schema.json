@@ -56,6 +56,11 @@
       "type": "boolean",
       "default": false,
       "required": true
+    },
+    "ndPaid": {
+      "type": "boolean",
+      "default": false,
+      "required": true
     }
   }
 }
