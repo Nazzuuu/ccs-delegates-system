@@ -67,7 +67,7 @@ export function useDelegates() {
   )
 
   const backoutList = computed(() =>
-    delegates.value.filter(d => d.status === 'Backout')
+    delegates.value.filter(d => d.isBackout)
   )
 
   // ── Mutations: optimistic local update + sync to Strapi via documentId ───
@@ -87,7 +87,8 @@ export function useDelegates() {
     if (!d) return
     d.status = 'Not Paid'
     d.isPaid = false
-    await updateDelegate(d.documentId, { status: 'Not Paid', isPaid: false })
+    d.isBackout = false
+    await updateDelegate(d.documentId, { status: 'Not Paid', isPaid: false, isBackout: false })
   }
 
   async function markBackout(id: number) {
@@ -95,7 +96,8 @@ export function useDelegates() {
     if (!d) return
     d.status = 'Backout'
     d.isPaid = false
-    await updateDelegate(d.documentId, { status: 'Backout', isPaid: false })
+    d.isBackout = true
+    await updateDelegate(d.documentId, { status: 'Backout', isPaid: false, isBackout: true })
   }
 
   async function markReceived(id: number) {

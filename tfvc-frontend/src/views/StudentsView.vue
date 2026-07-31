@@ -33,14 +33,9 @@ const ndFilterYear  = ref('All')
 const ndCurrentPage = ref(1)
 const ND_PAGE_SIZE  = 10
 
-// Track IDs of delegates that were originally Backout and got paid from this tab.
-// This lets us keep them visible in this tab and count them in the Paid stat.
-const paidFromNd = ref<Set<number>>(new Set())
-
+// ndList = all delegates that have ever been marked Backout (isBackout flag is persistent)
 const ndList = computed(() =>
-  delegates.value.filter(d =>
-    d.status === 'Backout' || paidFromNd.value.has(d.id)
-  )
+  delegates.value.filter(d => d.isBackout)
 )
 
 const ndPaidCount    = computed(() => ndList.value.filter(d => d.status === 'Paid').length)
@@ -71,7 +66,7 @@ async function ndMarkPaid(id: number) {
   ndActionLoading.value = new Set([...ndActionLoading.value, id])
   try {
     await markPaid(id)
-    paidFromNd.value = new Set([...paidFromNd.value, id])
+    // isBackout stays true in Strapi — delegate remains in backoutList and ndList
   } finally {
     ndActionLoading.value = new Set([...ndActionLoading.value].filter(x => x !== id))
   }

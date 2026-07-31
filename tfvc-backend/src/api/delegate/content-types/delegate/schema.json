@@ -51,6 +51,11 @@
     },
     "paidAt": {
       "type": "datetime"
+    },
+    "isBackout": {
+      "type": "boolean",
+      "default": false,
+      "required": true
     }
   }
 }
