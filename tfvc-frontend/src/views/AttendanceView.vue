@@ -1826,8 +1826,20 @@ async function handlePaidPull() {
     }
     paidProgress.value = 80
 
-    // ── Build paidRows — no dedup, each delegate is unique by documentId ──
-    const built: PaidRow[] = paid.map(d => {
+    // ── Build paidRows — dedup by studentId first, then by name ──
+    // Removes duplicates (same studentId or same name) keeping the first occurrence.
+    const seenIds   = new Set<string>()
+    const seenNames = new Set<string>()
+    const dedupedPaid = paid.filter(d => {
+      const sid  = d.studentId?.trim()
+      const nameKey = d.name.toUpperCase().trim()
+      if (sid && seenIds.has(sid))     return false
+      if (seenNames.has(nameKey))       return false
+      if (sid) seenIds.add(sid)
+      seenNames.add(nameKey)
+      return true
+    })
+    const built: PaidRow[] = dedupedPaid.map(d => {
       const strapiDay = students.value.find(
         s => (d.studentId?.trim() && s.studentId && s.studentId.trim() === d.studentId.trim())
           || s.name.toUpperCase().trim() === d.name.toUpperCase().trim()
