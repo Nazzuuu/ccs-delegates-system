@@ -676,22 +676,27 @@ export function toAttYearLevel(delegateYear: string): string {
 }
 
 /**
- * After editing a delegate's name/studentId/yearLevel in the CCS delegates system,
- * propagate those changes to ALL tables in the attendance system that store
- * denormalized student info: att-students, att-records, att-logouts, att-winners.
+ * After editing a delegate's name/studentId/yearLevel in EITHER system,
+ * propagate those changes to ALL tables that store denormalized student info:
+ *   - delegates       (CCS Delegates system — yearLevel in long form e.g. "Fourth Year")
+ *   - att-students    (Attendance system — yearLevel in short form e.g. "4th Year")
+ *   - att-records     (Attendance login records)
+ *   - att-logouts     (Attendance logout records)
+ *   - att-winners     (Raffle winner records)
  *
  * Matching strategy — a record matches if:
  *   • studentId matches oldStudentId (when non-empty), OR
  *   • name matches oldName (case-insensitive)
- * Both checks run in parallel so records with mismatched IDs are still caught by name.
  *
  * Deduplication: if multiple att-student records match (e.g. from a previous partial sync),
  * only the first one is updated — the rest are deleted to prevent duplicates.
+ *
+ * newYearLevel must be in the long delegates format ("First Year" / "Fourth Year" / etc.)
  */
 export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<void> {
   const { oldStudentId, oldName, newStudentId, newName, newYearLevel } = payload
 
-  // Convert yearLevel to the short form the attendance system stores
+  // Short form ("4th Year") used by att-* collections
   const attYearLevel = toAttYearLevel(newYearLevel)
 
   function matches(id: string, n: string): boolean {
@@ -700,8 +705,9 @@ export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<vo
     return byId || byName
   }
 
-  // Run all four collection fetches in parallel
-  const [attStudents, attRecords, attLogouts, attWinners] = await Promise.all([
+  // Fetch all five collections in parallel (delegates + four att-* collections)
+  const [allDelegates, attStudents, attRecords, attLogouts, attWinners] = await Promise.all([
+    fetchAllDelegates(),
     fetchAttStudents(),
     fetchAttRecords(),
     fetchAttLogouts(),
@@ -709,19 +715,31 @@ export async function syncDelegateEdit(payload: DelegateSyncPayload): Promise<vo
   ])
 
   // Filter matching records per collection
-  const studentsToUpdate = attStudents.filter(s => matches(s.studentId, s.name))
-  const recordsToUpdate  = attRecords.filter(r  => matches(r.studentId,  r.name))
-  const logoutsToUpdate  = attLogouts.filter(l  => matches(l.studentId,  l.name))
-  const winnersToUpdate  = attWinners.filter(w  => matches(w.studentId,  w.name))
+  const delegatesToUpdate = allDelegates.filter(d => matches(d.studentId, d.name))
+  const studentsToUpdate  = attStudents.filter(s => matches(s.studentId, s.name))
+  const recordsToUpdate   = attRecords.filter(r  => matches(r.studentId,  r.name))
+  const logoutsToUpdate   = attLogouts.filter(l  => matches(l.studentId,  l.name))
+  const winnersToUpdate   = attWinners.filter(w  => matches(w.studentId,  w.name))
 
   // ── Deduplicate att-students ──────────────────────────────────────────────
   // If more than one att-student matched (e.g. from a previous partial sync that
   // left a stale copy), update only the first and delete the rest.
   const [primaryStudent, ...duplicateStudents] = studentsToUpdate
 
-  // Fire all updates in parallel
+  // Fire all updates in parallel across both systems
   await Promise.all([
-    // Update the primary att-student record
+    // ── CCS Delegates system ─────────────────────────────────────────────────
+    // newYearLevel is already in long form ("Fourth Year") — correct for delegates
+    ...delegatesToUpdate.map(d =>
+      updateDelegate(d.documentId, {
+        studentId: newStudentId,
+        name:      newName,
+        yearLevel: newYearLevel,
+      })
+    ),
+
+    // ── Attendance system ────────────────────────────────────────────────────
+    // Update the primary att-student record (short year level e.g. "4th Year")
     ...(primaryStudent
       ? [updateAttStudent(primaryStudent.id, {
           studentId: newStudentId,
