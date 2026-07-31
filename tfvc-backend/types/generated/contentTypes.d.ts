@@ -640,6 +640,7 @@ export interface ApiAttStudentAttStudent extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     name: Schema.Attribute.String & Schema.Attribute.Required;
+    paidDay: Schema.Attribute.Enumeration<['First Day', 'Second Day']>;
     publishedAt: Schema.Attribute.DateTime;
     studentId: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
@@ -711,10 +712,50 @@ export interface ApiDelegateDelegate extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     name: Schema.Attribute.String & Schema.Attribute.Required;
+    paidAt: Schema.Attribute.DateTime;
     publishedAt: Schema.Attribute.DateTime;
     status: Schema.Attribute.Enumeration<['Paid', 'Not Paid', 'Backout']> &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'Not Paid'>;
+    studentId: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    yearLevel: Schema.Attribute.Enumeration<
+      ['First Year', 'Second Year', 'Third Year', 'Fourth Year']
+    > &
+      Schema.Attribute.Required;
+  };
+}
+
+export interface ApiNonDelegateNonDelegate extends Struct.CollectionTypeSchema {
+  collectionName: 'non_delegates';
+  info: {
+    description: 'Backout delegates tracked independently from the main delegates list';
+    displayName: 'Non-Delegate';
+    pluralName: 'non-delegates';
+    singularName: 'non-delegate';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::non-delegate.non-delegate'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    paidAt: Schema.Attribute.DateTime;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<['Paid', 'Not Paid', 'Backout']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'Backout'>;
+    studentId: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1244,6 +1285,7 @@ declare module '@strapi/strapi' {
       'api::att-student.att-student': ApiAttStudentAttStudent;
       'api::att-winner.att-winner': ApiAttWinnerAttWinner;
       'api::delegate.delegate': ApiDelegateDelegate;
+      'api::non-delegate.non-delegate': ApiNonDelegateNonDelegate;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;
