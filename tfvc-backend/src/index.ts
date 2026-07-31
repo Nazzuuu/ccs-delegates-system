@@ -16,5 +16,25 @@ export default {
    * This gives you an opportunity to set up your data model,
    * run jobs, or perform some special logic.
    */
-  bootstrap(/* { strapi }: { strapi: Core.Strapi } */) {},
+  async bootstrap({ strapi }) {
+    // One-time migration: set isBackout=true for all delegates currently in Backout status
+    // that haven't been initialized yet (isBackout is null).
+    const backoutDelegates = await strapi.entityService.findMany('api::delegate.delegate', {
+      filters: { status: 'Backout' },
+      limit: 1000,
+    }) as any[];
+
+    let updated = 0;
+    for (const d of backoutDelegates) {
+      if (d.isBackout !== true) {
+        await strapi.entityService.update('api::delegate.delegate', d.id, {
+          data: { isBackout: true },
+        });
+        updated++;
+      }
+    }
+    if (updated > 0) {
+      strapi.log.info(`✓ Backfilled isBackout=true for ${updated} Backout delegates`);
+    }
+  },
 };
