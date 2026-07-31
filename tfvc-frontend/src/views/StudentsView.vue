@@ -77,14 +77,12 @@ async function ndMarkPaid(id: number) {
   }
 }
 
-async function ndMarkUnpaid(id: number) {
+async function ndMarkUndo(id: number) {
   if (ndActionLoading.value.has(id)) return
   ndActionLoading.value = new Set([...ndActionLoading.value, id])
   try {
-    await markUnpaid(id)
-    // Once undone (back to Not Paid / Backout), keep them in ndList since
-    // markUnpaid sets status to 'Not Paid' which moves them to the Delegates tab.
-    // Remove from paidFromNd so they follow normal backout logic again.
+    // Undo paid → revert to Backout (not Not Paid), so they stay in this list
+    await markBackout(id)
     paidFromNd.value = new Set([...paidFromNd.value].filter(x => x !== id))
   } finally {
     ndActionLoading.value = new Set([...ndActionLoading.value].filter(x => x !== id))
@@ -452,7 +450,7 @@ function generateBarcodes() {
                     </button>
                     <button
                       v-if="d.status === 'Paid'"
-                      @click="ndMarkUnpaid(d.id)"
+                      @click="ndMarkUndo(d.id)"
                       :disabled="ndActionLoading.has(d.id)"
                       class="btn-secondary inline-flex items-center gap-1 text-xs px-2.5 py-1 disabled:opacity-50"
                     >
