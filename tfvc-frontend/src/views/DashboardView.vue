@@ -20,19 +20,21 @@ const backoutCount = computed(() => delegates.value.filter(d => d.status === 'Ba
 function prevPage() { if (currentPage.value > 1) currentPage.value-- }
 function nextPage() { if (currentPage.value < totalPages.value) currentPage.value++ }
 
-// ── Detail modal ──────────────────────────────────────────────────────────
-const selectedDelegate = ref<typeof delegates.value[number] | null>(null)
-const showDetail = ref(false)
+// ── Card list modal ───────────────────────────────────────────────────────
+type CardFilter = 'All' | 'Paid' | 'Not Paid' | 'Backout'
+const showCardList  = ref(false)
+const cardListLabel = ref<CardFilter>('All')
 
-function openDetail(d: typeof delegates.value[number]) {
-  selectedDelegate.value = d
-  showDetail.value = true
-}
+const cardListItems = computed(() => {
+  if (cardListLabel.value === 'All') return delegates.value
+  return delegates.value.filter(d => d.status === cardListLabel.value)
+})
 
-function closeDetail() {
-  showDetail.value = false
-  selectedDelegate.value = null
+function openCardList(label: CardFilter) {
+  cardListLabel.value = label
+  showCardList.value  = true
 }
+function closeCardList() { showCardList.value = false }
 </script>
 
 <template>
@@ -49,24 +51,53 @@ function closeDetail() {
       {{ error }} — Make sure Strapi is running on port 1337.
     </div>
 
-    <!-- Stats -->
+    <!-- Stats — each card has a View List eye-icon button -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-      <div class="card p-3 sm:p-4">
-        <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p>
-        <p class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ delegates.length }}</p>
+
+      <!-- Total -->
+      <div class="card p-3 sm:p-4 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p>
+          <button @click="openCardList('All')" title="View List" class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+        <p class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">{{ delegates.length }}</p>
       </div>
-      <div class="card p-3 sm:p-4 border-green-200 dark:border-green-900">
-        <p class="text-xs text-sync-green font-medium uppercase tracking-wide">Paid</p>
-        <p class="text-2xl sm:text-3xl font-bold text-sync-green mt-1">{{ paidCount }}</p>
+
+      <!-- Paid -->
+      <div class="card p-3 sm:p-4 border-green-200 dark:border-green-900 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-sync-green font-medium uppercase tracking-wide">Paid</p>
+          <button @click="openCardList('Paid')" title="View List" class="inline-flex items-center gap-1 text-xs text-sync-green/60 hover:text-sync-green transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+        <p class="text-2xl sm:text-3xl font-bold text-sync-green">{{ paidCount }}</p>
       </div>
-      <div class="card p-3 sm:p-4 border-red-200 dark:border-red-900">
-        <p class="text-xs text-red-500 font-medium uppercase tracking-wide">Not Paid</p>
-        <p class="text-2xl sm:text-3xl font-bold text-red-500 mt-1">{{ unpaidCount }}</p>
+
+      <!-- Not Paid -->
+      <div class="card p-3 sm:p-4 border-red-200 dark:border-red-900 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-red-500 font-medium uppercase tracking-wide">Not Paid</p>
+          <button @click="openCardList('Not Paid')" title="View List" class="inline-flex items-center gap-1 text-xs text-red-300 hover:text-red-500 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+        <p class="text-2xl sm:text-3xl font-bold text-red-500">{{ unpaidCount }}</p>
       </div>
-      <div class="card p-3 sm:p-4">
-        <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Backout</p>
-        <p class="text-2xl sm:text-3xl font-bold text-gray-400 mt-1">{{ backoutCount }}</p>
+
+      <!-- Backout -->
+      <div class="card p-3 sm:p-4 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Backout</p>
+          <button @click="openCardList('Backout')" title="View List" class="inline-flex items-center gap-1 text-xs text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+        <p class="text-2xl sm:text-3xl font-bold text-gray-400">{{ backoutCount }}</p>
       </div>
+
     </div>
 
     <!-- Search & Filters -->
@@ -109,7 +140,6 @@ function closeDetail() {
               <th class="table-th">Name</th>
               <th class="table-th">Year Level</th>
               <th class="table-th">Status</th>
-              <th class="table-th text-center">View</th>
             </tr>
           </thead>
           <tbody>
@@ -121,23 +151,9 @@ function closeDetail() {
               <td class="table-td">
                 <span :class="{'badge-paid': d.status==='Paid', 'badge-unpaid': d.status==='Not Paid', 'badge-backout': d.status==='Backout'}">{{ d.status }}</span>
               </td>
-              <td class="table-td text-center">
-                <button
-                  @click="openDetail(d)"
-                  title="View Details"
-                  class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/50 border border-blue-200 dark:border-blue-700 transition-colors"
-                >
-                  <!-- Eye icon -->
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                  </svg>
-                  View
-                </button>
-              </td>
             </tr>
             <tr v-if="paginated.length === 0">
-              <td colspan="6" class="table-td text-center text-gray-400 py-10">No delegates found.</td>
+              <td colspan="5" class="table-td text-center text-gray-400 py-10">No delegates found.</td>
             </tr>
           </tbody>
         </table>
@@ -161,108 +177,63 @@ function closeDetail() {
     </div>
   </div>
 
-  <!-- ── Detail Modal ─────────────────────────────────────────────────────── -->
+  <!-- ── Card List Modal (eye icon on stat cards) ──────────────────────── -->
   <Teleport to="body">
-    <Transition
-      enter-active-class="transition-opacity duration-200"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition-opacity duration-200"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="showDetail && selectedDelegate"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        @click.self="closeDetail"
-      >
-        <Transition
-          enter-active-class="transition-all duration-200"
-          enter-from-class="opacity-0 scale-95"
-          enter-to-class="opacity-100 scale-100"
-          leave-active-class="transition-all duration-150"
-          leave-from-class="opacity-100 scale-100"
-          leave-to-class="opacity-0 scale-95"
-        >
-          <div
-            v-if="showDetail"
-            class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
-          >
-            <!-- Modal header -->
-            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                </svg>
-                <h3 class="text-base font-bold text-gray-800 dark:text-white">Delegate Details</h3>
-              </div>
-              <button
-                @click="closeDetail"
-                class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
+    <Transition enter-active-class="transition-opacity duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100"
+                leave-active-class="transition-opacity duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
+      <div v-if="showCardList" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="closeCardList">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[80vh]">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+              <h3 class="text-base font-bold text-gray-800 dark:text-white">
+                {{ cardListLabel === 'All' ? 'All Delegates' : cardListLabel + ' Delegates' }}
+                <span class="ml-1.5 text-sm font-normal text-gray-400">({{ cardListItems.length }})</span>
+              </h3>
             </div>
-
-            <!-- Modal body -->
-            <div class="px-5 py-5 space-y-4">
-              <!-- Avatar / name -->
-              <div class="flex items-center gap-3">
-                <div class="w-12 h-12 rounded-full bg-sync-green flex items-center justify-center flex-shrink-0">
-                  <span class="text-white text-lg font-bold leading-none">{{ selectedDelegate.name.charAt(0).toUpperCase() }}</span>
-                </div>
-                <div>
-                  <p class="font-bold text-gray-800 dark:text-white leading-tight">{{ selectedDelegate.name }}</p>
-                  <p class="text-xs text-gray-400 mt-0.5">{{ shortYear(selectedDelegate.yearLevel) }}</p>
-                </div>
-              </div>
-
-              <!-- Detail rows -->
-              <div class="space-y-2.5 text-sm">
-                <div class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-                  <span class="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Student ID</span>
-                  <span class="font-mono text-gray-800 dark:text-gray-100 font-semibold">{{ selectedDelegate.studentId || '—' }}</span>
-                </div>
-                <div class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-                  <span class="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Year Level</span>
-                  <span class="text-gray-800 dark:text-gray-100 font-semibold">{{ shortYear(selectedDelegate.yearLevel) }}</span>
-                </div>
-                <div class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-                  <span class="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Status</span>
-                  <span :class="{'badge-paid': selectedDelegate.status==='Paid', 'badge-unpaid': selectedDelegate.status==='Not Paid', 'badge-backout': selectedDelegate.status==='Backout'}">
-                    {{ selectedDelegate.status }}
-                  </span>
-                </div>
-                <div v-if="selectedDelegate.isBackout !== undefined" class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-                  <span class="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Is Backout</span>
-                  <span :class="selectedDelegate.isBackout ? 'text-yellow-500 font-semibold' : 'text-gray-400'">
-                    {{ selectedDelegate.isBackout ? 'Yes' : 'No' }}
-                  </span>
-                </div>
-                <div v-if="selectedDelegate.isBackout" class="flex items-center justify-between py-2">
-                  <span class="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">ND Payment</span>
-                  <span :class="selectedDelegate.ndPaid ? 'badge-paid' : 'badge-backout'">
-                    {{ selectedDelegate.ndPaid ? 'Paid' : 'Not Paid' }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Modal footer -->
-            <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-800 flex justify-end">
-              <button
-                @click="closeDetail"
-                class="btn-secondary inline-flex items-center gap-1.5 text-sm px-4 py-2"
-              >
-                Close
-              </button>
-            </div>
+            <button @click="closeCardList" class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
           </div>
-        </Transition>
+          <!-- List -->
+          <div class="overflow-y-auto flex-1">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-white dark:bg-gray-900">
+                <tr>
+                  <th class="table-th w-10">#</th>
+                  <th class="table-th">Student ID</th>
+                  <th class="table-th">Name</th>
+                  <th class="table-th">Year</th>
+                  <th class="table-th">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(d, idx) in cardListItems" :key="d.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+                  <td class="table-td text-gray-400 text-xs">{{ idx + 1 }}</td>
+                  <td class="table-td font-mono text-xs text-gray-500 dark:text-gray-400">{{ d.studentId || '—' }}</td>
+                  <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
+                  <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
+                  <td class="table-td">
+                    <span :class="{'badge-paid': d.status==='Paid','badge-unpaid': d.status==='Not Paid','badge-backout': d.status==='Backout'}">{{ d.status }}</span>
+                  </td>
+                </tr>
+                <tr v-if="cardListItems.length === 0">
+                  <td colspan="5" class="table-td text-center text-gray-400 py-8">No delegates found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Footer -->
+          <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-end flex-shrink-0">
+            <button @click="closeCardList" class="btn-secondary inline-flex items-center gap-1.5 text-sm px-4 py-2">Close</button>
+          </div>
+        </div>
       </div>
     </Transition>
   </Teleport>
+
 </template>
