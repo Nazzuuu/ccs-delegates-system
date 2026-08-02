@@ -422,6 +422,33 @@ function openDashModal(type: DashModalType) {
 }
 function closeDashModal() { dashModal.value = { show: false, type: null } }
 
+function exportDashModalCSV() {
+  const type = dashModal.value.type
+  if (type !== 'firstday' && type !== 'secondday') return
+  const rows = dashModalRows.value
+  if (!rows.length) { toast('No records to export.', 'error'); return }
+  const label = type === 'firstday' ? '1st_Day' : '2nd_Day'
+  const header = ['Student ID', 'Name', 'Year Level', 'Dept', 'Status']
+  const csvRows = [
+    header.join(','),
+    ...rows.map(r => [
+      `"${r.studentId}"`,
+      `"${r.name.replace(/"/g, '""')}"`,
+      `"${r.yearLevel}"`,
+      `"${r.dept}"`,
+      `"${r.status ?? ''}"`,
+    ].join(','))
+  ]
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `CCS_Delegates_${label}_${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast(`Exported ${rows.length} records as CSV.`, 'success')
+}
+
 interface DashRow { studentId: string; name: string; yearLevel: string; dept: string; status?: string; timeIn?: string; date?: string }
 
 const dashModalRows = computed<DashRow[]>(() => {
@@ -3522,9 +3549,21 @@ onMounted(() => {
             <h2 class="text-base font-bold text-gray-900 dark:text-white">{{ dashModalTitle }}</h2>
             <p class="text-xs text-gray-400 mt-0.5">{{ dashModalRows.length }} record{{ dashModalRows.length !== 1 ? 's' : '' }}</p>
           </div>
-          <button @click="closeDashModal" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 transition-colors">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="dashModal.type === 'firstday' || dashModal.type === 'secondday'"
+              @click="exportDashModalCSV"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors"
+              title="Export as CSV (opens in Excel)">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Export CSV
+            </button>
+            <button @click="closeDashModal" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 transition-colors">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
         <div class="flex flex-wrap gap-2 px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
           <input v-model="dashModalSearch" type="text" placeholder="Search name or ID..." class="input-search w-full sm:flex-1 sm:min-w-[160px] text-sm" />
