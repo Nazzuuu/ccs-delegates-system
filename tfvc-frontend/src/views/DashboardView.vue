@@ -11,7 +11,7 @@ const currentPage = ref(1)
 watch([searchQuery, filterStatus, filterYear], () => { currentPage.value = 1 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
-const paginated = computed(() => filtered.value.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE))
+const paginated  = computed(() => filtered.value.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE))
 
 const paidCount    = computed(() => delegates.value.filter(d => d.status === 'Paid').length)
 const unpaidCount  = computed(() => delegates.value.filter(d => d.status === 'Not Paid').length)
@@ -22,19 +22,36 @@ function nextPage() { if (currentPage.value < totalPages.value) currentPage.valu
 
 // ── Card list modal ───────────────────────────────────────────────────────
 type CardFilter = 'All' | 'Paid' | 'Not Paid' | 'Backout'
-const showCardList  = ref(false)
-const cardListLabel = ref<CardFilter>('All')
+const showCardList   = ref(false)
+const cardListLabel  = ref<CardFilter>('All')
+const modalSearch    = ref('')
+const modalYearFilter = ref('All')
 
-const cardListItems = computed(() => {
+// Reset filters when opening a new card
+function openCardList(label: CardFilter) {
+  cardListLabel.value   = label
+  modalSearch.value     = ''
+  modalYearFilter.value = 'All'
+  showCardList.value    = true
+}
+function closeCardList() { showCardList.value = false }
+
+// Base list filtered by the card status
+const cardBaseItems = computed(() => {
   if (cardListLabel.value === 'All') return delegates.value
   return delegates.value.filter(d => d.status === cardListLabel.value)
 })
 
-function openCardList(label: CardFilter) {
-  cardListLabel.value = label
-  showCardList.value  = true
-}
-function closeCardList() { showCardList.value = false }
+// Further filtered by modal search + year
+const cardListItems = computed(() =>
+  cardBaseItems.value.filter(d => {
+    const matchName = d.name.toLowerCase().includes(modalSearch.value.toLowerCase())
+    const matchYear = modalYearFilter.value === 'All' ||
+      d.yearLevel.toLowerCase().replace(/\s+/g, ' ').trim() ===
+      modalYearFilter.value.toLowerCase().replace(/\s+/g, ' ').trim()
+    return matchName && matchYear
+  })
+)
 </script>
 
 <template>
@@ -51,52 +68,52 @@ function closeCardList() { showCardList.value = false }
       {{ error }} — Make sure Strapi is running on port 1337.
     </div>
 
-    <!-- Stats — each card has a View List eye-icon button -->
+    <!-- Stats — full card is clickable -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
 
       <!-- Total -->
-      <div class="card p-3 sm:p-4 flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-          <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p>
-          <button @click="openCardList('All')" title="View List" class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-          </button>
-        </div>
+      <button @click="openCardList('All')"
+        class="card p-3 sm:p-4 flex flex-col gap-2 text-left w-full hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all cursor-pointer group">
+        <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p>
         <p class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">{{ delegates.length }}</p>
-      </div>
+        <div class="flex items-center gap-1 text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors mt-auto">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          View List
+        </div>
+      </button>
 
       <!-- Paid -->
-      <div class="card p-3 sm:p-4 border-green-200 dark:border-green-900 flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-          <p class="text-xs text-sync-green font-medium uppercase tracking-wide">Paid</p>
-          <button @click="openCardList('Paid')" title="View List" class="inline-flex items-center gap-1 text-xs text-sync-green/60 hover:text-sync-green transition-colors">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-          </button>
-        </div>
+      <button @click="openCardList('Paid')"
+        class="card p-3 sm:p-4 border-green-200 dark:border-green-900 flex flex-col gap-2 text-left w-full hover:shadow-md hover:border-green-300 dark:hover:border-green-700 transition-all cursor-pointer group">
+        <p class="text-xs text-sync-green font-medium uppercase tracking-wide">Paid</p>
         <p class="text-2xl sm:text-3xl font-bold text-sync-green">{{ paidCount }}</p>
-      </div>
+        <div class="flex items-center gap-1 text-xs text-sync-green/50 group-hover:text-sync-green transition-colors mt-auto">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          View List
+        </div>
+      </button>
 
       <!-- Not Paid -->
-      <div class="card p-3 sm:p-4 border-red-200 dark:border-red-900 flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-          <p class="text-xs text-red-500 font-medium uppercase tracking-wide">Not Paid</p>
-          <button @click="openCardList('Not Paid')" title="View List" class="inline-flex items-center gap-1 text-xs text-red-300 hover:text-red-500 transition-colors">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-          </button>
-        </div>
+      <button @click="openCardList('Not Paid')"
+        class="card p-3 sm:p-4 border-red-200 dark:border-red-900 flex flex-col gap-2 text-left w-full hover:shadow-md hover:border-red-300 dark:hover:border-red-700 transition-all cursor-pointer group">
+        <p class="text-xs text-red-500 font-medium uppercase tracking-wide">Not Paid</p>
         <p class="text-2xl sm:text-3xl font-bold text-red-500">{{ unpaidCount }}</p>
-      </div>
+        <div class="flex items-center gap-1 text-xs text-red-300 group-hover:text-red-500 transition-colors mt-auto">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          View List
+        </div>
+      </button>
 
       <!-- Backout -->
-      <div class="card p-3 sm:p-4 flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-          <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Backout</p>
-          <button @click="openCardList('Backout')" title="View List" class="inline-flex items-center gap-1 text-xs text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-colors">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-          </button>
-        </div>
+      <button @click="openCardList('Backout')"
+        class="card p-3 sm:p-4 flex flex-col gap-2 text-left w-full hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all cursor-pointer group">
+        <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Backout</p>
         <p class="text-2xl sm:text-3xl font-bold text-gray-400">{{ backoutCount }}</p>
-      </div>
+        <div class="flex items-center gap-1 text-xs text-gray-300 group-hover:text-gray-500 dark:group-hover:text-gray-300 transition-colors mt-auto">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          View List
+        </div>
+      </button>
 
     </div>
 
@@ -122,10 +139,10 @@ function closeCardList() { showCardList.value = false }
       </div>
     </div>
 
-    <!-- Table — read-only with View button -->
+    <!-- Table -->
     <div class="card overflow-hidden">
       <div v-if="loading" class="flex items-center justify-center py-16 text-gray-400">
-        <svg class="animate-spin h-6 w-6 mr-3 text-sync-green" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg class="animate-spin h-6 w-6 mr-3 text-sync-green" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
         </svg>
@@ -149,7 +166,7 @@ function closeCardList() { showCardList.value = false }
               <td class="table-td font-medium text-gray-800 dark:text-gray-100">{{ d.name }}</td>
               <td class="table-td text-xs text-gray-500 dark:text-gray-400">{{ shortYear(d.yearLevel) }}</td>
               <td class="table-td">
-                <span :class="{'badge-paid': d.status==='Paid', 'badge-unpaid': d.status==='Not Paid', 'badge-backout': d.status==='Backout'}">{{ d.status }}</span>
+                <span :class="{'badge-paid': d.status==='Paid','badge-unpaid': d.status==='Not Paid','badge-backout': d.status==='Backout'}">{{ d.status }}</span>
               </td>
             </tr>
             <tr v-if="paginated.length === 0">
@@ -158,8 +175,6 @@ function closeCardList() { showCardList.value = false }
           </tbody>
         </table>
       </div>
-
-      <!-- Pagination -->
       <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
         <p class="text-xs text-gray-500">
           Showing {{ filtered.length === 0 ? 0 : (currentPage - 1) * 10 + 1 }}–{{ Math.min(currentPage * 10, filtered.length) }} of {{ filtered.length }}
@@ -177,13 +192,14 @@ function closeCardList() { showCardList.value = false }
     </div>
   </div>
 
-  <!-- ── Card List Modal (eye icon on stat cards) ──────────────────────── -->
+  <!-- ── Card List Modal ───────────────────────────────────────────────── -->
   <Teleport to="body">
     <Transition enter-active-class="transition-opacity duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100"
                 leave-active-class="transition-opacity duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
       <div v-if="showCardList" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="closeCardList">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[80vh]">
-          <!-- Header -->
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[85vh]">
+
+          <!-- Modal header -->
           <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
             <div class="flex items-center gap-2">
               <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -199,10 +215,24 @@ function closeCardList() { showCardList.value = false }
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
+
+          <!-- Search + Year filter -->
+          <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0 flex gap-2">
+            <div class="flex-1 relative">
+              <span class="absolute inset-y-0 left-3 flex items-center text-gray-400 pointer-events-none">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
+              </span>
+              <input v-model="modalSearch" type="text" placeholder="Search name..." class="input-search pl-9 w-full"/>
+            </div>
+            <select v-model="modalYearFilter" class="input-search w-auto min-w-[120px]">
+              <option v-for="y in yearLevels" :key="y" :value="y">{{ y === 'All' ? 'All Years' : shortYear(y) }}</option>
+            </select>
+          </div>
+
           <!-- List -->
           <div class="overflow-y-auto flex-1">
             <table class="w-full text-sm">
-              <thead class="sticky top-0 bg-white dark:bg-gray-900">
+              <thead class="sticky top-0 bg-white dark:bg-gray-900 z-10">
                 <tr>
                   <th class="table-th w-10">#</th>
                   <th class="table-th">Student ID</th>
@@ -227,10 +257,12 @@ function closeCardList() { showCardList.value = false }
               </tbody>
             </table>
           </div>
+
           <!-- Footer -->
           <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-end flex-shrink-0">
             <button @click="closeCardList" class="btn-secondary inline-flex items-center gap-1.5 text-sm px-4 py-2">Close</button>
           </div>
+
         </div>
       </div>
     </Transition>
