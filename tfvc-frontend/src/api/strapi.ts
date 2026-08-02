@@ -168,6 +168,8 @@ export async function importDelegates(
         status: 'Not Paid',
         isPaid: false,
         isReceived: false,
+        isBackout: false,
+        ndPaid: false,
       })
       importedNames.add(upper)   // mark as imported so any later duplicate in this file is skipped
       result.added++

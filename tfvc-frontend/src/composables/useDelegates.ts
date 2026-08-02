@@ -129,6 +129,8 @@ export function useDelegates() {
       status: 'Not Paid',
       isPaid: false,
       isReceived: false,
+      isBackout: false,
+      ndPaid: false,
     })
     delegates.value.push(created)
   }
